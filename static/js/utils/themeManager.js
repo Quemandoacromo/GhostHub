@@ -398,7 +398,14 @@ function initThemeManager() {
     console.log('Initializing Theme Manager...');
 
     // Apply theme (don't update config, just apply from server)
+    const storedTheme = getUIConfigFromServer().theme;
     const theme = getCurrentTheme();
+    // Heal orphan theme ids (e.g. a custom theme that was deleted) so the
+    // in-memory config matches what's actually applied — otherwise selectors
+    // bound to the stored value will show a stale id until the next save.
+    if (storedTheme && storedTheme !== theme) {
+        updateAppConfigUI('theme', theme);
+    }
     applyTheme(theme, false);
 
     // Apply layout

@@ -61,6 +61,18 @@ function getActiveProfileRecord(profileData) {
     );
 }
 
+function getAvailableOptionValue(options, preferredValue, fallbackValue) {
+    const values = new Set(options.map(option => option.id));
+    if (values.has(preferredValue)) return preferredValue;
+    if (values.has(fallbackValue)) return fallbackValue;
+    return options[0]?.id || '';
+}
+
+function getAppliedThemeId() {
+    const theme = document.documentElement.getAttribute('data-theme');
+    return theme && theme !== 'custom' ? theme : 'dark';
+}
+
 /**
  * Creates the user preferences section.
  * @param {Function} closeConfigModal - Callback to close the config modal
@@ -391,17 +403,26 @@ export function createUserPreferencesSection(closeConfigModal) {
 
     // Get server defaults for fallback
     const runtimeConfig = window.ragotModules?.appStore?.get?.('config', {}) || {};
-    const serverTheme = runtimeConfig?.javascript_config?.ui?.theme || 'dark';
-    const serverLayout = runtimeConfig?.javascript_config?.ui?.layout || 'default';
+    const serverTheme = runtimeConfig?.javascript_config?.ui?.theme || getAppliedThemeId();
+    const serverLayout = runtimeConfig?.javascript_config?.ui?.layout || 'streaming';
     const serverFeatures = runtimeConfig?.javascript_config?.ui?.features || {};
 
     function syncPreferenceControls() {
         if (themeSelect) {
-            themeSelect.value = getUserPreference('theme', serverTheme);
+            const themes = getAvailableThemes();
+            themeSelect.value = getAvailableOptionValue(
+                themes,
+                getUserPreference('theme', serverTheme),
+                getAppliedThemeId()
+            );
         }
 
         if (layoutSelect) {
-            layoutSelect.value = getUserPreference('layout', serverLayout);
+            layoutSelect.value = getAvailableOptionValue(
+                AVAILABLE_LAYOUTS,
+                getUserPreference('layout', serverLayout),
+                'streaming'
+            );
         }
 
         if (motionSelect) {
@@ -444,11 +465,16 @@ export function createUserPreferencesSection(closeConfigModal) {
     });
 
     const themes = getAvailableThemes();
+    const currentTheme = getAvailableOptionValue(
+        themes,
+        getUserPreference('theme', serverTheme),
+        getAppliedThemeId()
+    );
     themes.forEach(theme => {
-        themeSelect.appendChild(createElement('option', { value: theme.id, textContent: theme.name }));
+        const opt = createElement('option', { value: theme.id, textContent: theme.name });
+        if (theme.id === currentTheme) opt.selected = true;
+        themeSelect.appendChild(opt);
     });
-
-    const currentTheme = getUserPreference('theme', serverTheme);
     themeSelect.value = currentTheme;
 
     lifecycle.on(themeSelect, 'change', async () => {
@@ -480,7 +506,11 @@ export function createUserPreferencesSection(closeConfigModal) {
                     themeSelect.appendChild(createElement('option', { value: theme.id, textContent: theme.name }));
                 });
             }
-            themeSelect.value = payload.theme;
+            themeSelect.value = getAvailableOptionValue(
+                getAvailableThemes(),
+                payload.theme,
+                getAppliedThemeId()
+            );
         }
     };
     lifecycle.listen(APP_EVENTS.THEME_CHANGED, themeChangedHandler);
@@ -524,7 +554,11 @@ export function createUserPreferencesSection(closeConfigModal) {
         layoutSelect.appendChild(createElement('option', { value: layout.id, textContent: layout.name }));
     });
 
-    const currentLayout = getUserPreference('layout', serverLayout);
+    const currentLayout = getAvailableOptionValue(
+        AVAILABLE_LAYOUTS,
+        getUserPreference('layout', serverLayout),
+        'streaming'
+    );
     layoutSelect.value = currentLayout;
 
     lifecycle.on(layoutSelect, 'change', async () => {
