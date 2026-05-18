@@ -35,10 +35,14 @@ describe('shared shell tokens', () => {
         expect(css).toContain('top: var(--app-overlay-top-offset);');
     });
 
-    it('uses shared viewport math for the main shell container', () => {
+    it('lets the app shell main resolve child container height', () => {
+        const baseCss = readCssFile('base.css');
         const layoutCss = readCssFile('layout.css');
 
-        expect(layoutCss).toContain('height: calc(100vh - var(--app-content-top));');
+        expect(baseCss).toContain('#app-shell > main');
+        expect(baseCss).toContain('flex: 1 1 auto;');
+        expect(baseCss).toContain('min-height: 0;');
+        expect(layoutCss).toContain('height: 100%;');
         expect(layoutCss).toContain('padding: var(--space-lg) var(--app-page-padding-x);');
     });
 });

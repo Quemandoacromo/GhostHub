@@ -2,10 +2,10 @@
 /* All controls around the edges, main app shrunk in center */
 
 :root {
-    --theme-builder-app-scale: 0.92;
-    --theme-builder-app-translate-y: 0px;
-    --theme-builder-app-inset-x: clamp(16px, 4vw, 40px);
-    --theme-builder-app-inset-y: clamp(12px, 3vh, 28px);
+    --theme-builder-app-inset-top: clamp(124px, 16vh, 152px);
+    --theme-builder-app-inset-right: clamp(104px, 9vw, 136px);
+    --theme-builder-app-inset-bottom: clamp(196px, 28vh, 260px);
+    --theme-builder-app-inset-left: clamp(104px, 9vw, 136px);
 }
 
 .gh-theme-builder {
@@ -38,7 +38,7 @@
 .gh-theme-builder__backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.3);
+    background: transparent;
     z-index: -1;
     cursor: pointer;
     opacity: 1;
@@ -50,9 +50,9 @@
 .gh-theme-builder__backdrop::after {
     content: 'Click to preview theme';
     position: absolute;
-    bottom: 50%;
+    top: calc(var(--theme-builder-app-inset-top) - 48px);
     left: 50%;
-    transform: translate(-50%, 50%);
+    transform: translateX(-50%);
     background: rgba(0, 0, 0, 0.85);
     color: rgba(255, 255, 255, 0.8);
     padding: 12px 20px;
@@ -85,72 +85,117 @@
 
 html.theme-builder-edit,
 body.theme-builder-active {
+    background: #000;
     overflow: hidden;
 }
 
-body.theme-builder-active > :not(.gh-theme-builder):not(main):not(#streaming-container):not(#gallery-container):not(.gh-header):not(.gh-search):not(.chat-container) {
-    transform: scale(var(--theme-builder-app-scale)) translateY(var(--theme-builder-app-translate-y));
+/*
+ * Minimize the app into a live preview viewport.
+ * #app-shell is a containing block (transform: translateZ(0) in base.css), so
+ * every position: fixed descendant — header, search dropdown, chat, media
+ * viewer, photo viewer, in-app overlays — shrinks with the shell. The black
+ * body background becomes the edit workspace that holds the controls.
+ */
+body.theme-builder-active #app-shell {
+    inset:
+        var(--theme-builder-app-inset-top)
+        var(--theme-builder-app-inset-right)
+        var(--theme-builder-app-inset-bottom)
+        var(--theme-builder-app-inset-left);
     border-radius: var(--app-surface-radius);
-    overflow: clip;
-    transform-origin: center center;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.14),
+        0 24px 80px rgba(0, 0, 0, 0.72);
 }
 
-/* The real scroll shells need to stay untransformed or edit mode shows a stale
-   top-of-page frame. Shrink them by box geometry instead of compositor scale. */
-body.theme-builder-active > main,
-body.theme-builder-active > #streaming-container,
-body.theme-builder-active > #gallery-container {
-    transform: none;
-    border-radius: var(--app-surface-radius);
-    overflow: hidden;
-    transition:
-        top 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-        right 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-        bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-        left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-        margin 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+body.theme-builder-active #app-shell {
+    --app-header-height: 44px;
+    --app-content-top: 44px;
 }
 
-body.theme-builder-active > main {
-    margin: var(--space-md) var(--theme-builder-app-inset-x) var(--theme-builder-app-inset-y);
+body.theme-builder-active #app-shell .gh-header {
+    padding: 0 8px;
 }
 
-body.theme-builder-active > #streaming-container,
-body.theme-builder-active > #gallery-container {
-    top: calc(var(--app-content-top) + var(--theme-builder-app-inset-y) + var(--space-md));
-    right: var(--theme-builder-app-inset-x);
-    bottom: var(--theme-builder-app-inset-y);
-    left: var(--theme-builder-app-inset-x);
-    height: auto;
-    max-height: none;
+body.theme-builder-active #app-shell .gh-header__left,
+body.theme-builder-active #app-shell .gh-header__right {
+    gap: 2px;
+    min-width: 0;
 }
 
-body.theme-builder-active > .gh-header {
-    transform: none;
-    top: var(--theme-builder-app-inset-y);
-    left: var(--theme-builder-app-inset-x);
-    right: var(--theme-builder-app-inset-x);
+body.theme-builder-active #app-shell .gh-header__brand {
+    gap: 0;
+    padding: 2px;
+}
+
+body.theme-builder-active #app-shell .gh-header__title {
+    display: none;
+}
+
+body.theme-builder-active #app-shell .gh-header__logo {
+    width: 22px;
+    height: 22px;
+}
+
+body.theme-builder-active #app-shell .gh-header__btn {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+}
+
+body.theme-builder-active #app-shell .gh-header__btn svg {
+    width: 17px;
+    height: 17px;
+}
+
+body.theme-builder-active #app-shell .gh-header__sync-btn {
     width: auto;
+    min-width: 0;
+    height: 30px;
+    padding: 0 8px;
+    font-size: 0.65rem;
+}
+
+body.theme-builder-active .modal,
+body.theme-builder-active #dialog-overlay {
+    inset:
+        var(--theme-builder-app-inset-top)
+        var(--theme-builder-app-inset-right)
+        var(--theme-builder-app-inset-bottom)
+        var(--theme-builder-app-inset-left);
     border-radius: var(--app-surface-radius);
     overflow: hidden;
+    padding: var(--space-md);
 }
 
-body.theme-builder-active > .gh-search {
-    transform: none;
-    left: var(--theme-builder-app-inset-x);
-    right: var(--theme-builder-app-inset-x);
-    width: auto;
+body.theme-builder-active .modal__content,
+body.theme-builder-active .modal-content {
+    width: min(92%, var(--modal-max-width));
+    max-height: calc(100% - var(--space-xl));
 }
 
-body.theme-builder-active > .chat-container {
-    transform: none;
+body.theme-builder-active #toast-container,
+body.theme-builder-active .gallery-thumbnail-progress-notification {
+    top: calc(var(--theme-builder-app-inset-top) + var(--app-header-height) + 12px);
+    right: calc(var(--theme-builder-app-inset-right) + 16px);
+    width: min(320px, calc(100vw - var(--theme-builder-app-inset-left) - var(--theme-builder-app-inset-right) - 32px));
+    max-width: min(320px, calc(100vw - var(--theme-builder-app-inset-left) - var(--theme-builder-app-inset-right) - 32px));
 }
 
-/* Preview mode: body stays at its natural height/overflow.
-   The app uses inner scroll containers (body is height:100vh overflow:hidden flex).
-   No body/html overrides needed — the overlay is pointer-events:none so the
-   app is fully interactive without touching the scroll context. */
+body.theme-builder-active .download-notification {
+    bottom: calc(var(--theme-builder-app-inset-bottom) + 20px);
+    left: calc(var(--theme-builder-app-inset-left) + ((100vw - var(--theme-builder-app-inset-left) - var(--theme-builder-app-inset-right)) / 2));
+    max-width: calc(100vw - var(--theme-builder-app-inset-left) - var(--theme-builder-app-inset-right) - 32px);
+}
+
+body.theme-builder-active .gallery-processing-notifications {
+    right: calc(var(--theme-builder-app-inset-right) + 16px);
+    bottom: calc(var(--theme-builder-app-inset-bottom) + 16px);
+    max-width: min(320px, calc(100vw - var(--theme-builder-app-inset-left) - var(--theme-builder-app-inset-right) - 32px));
+}
+
+/* Preview mode (no theme-builder-active class on body) lets #app-shell return
+   to inset: 0 via the base transition, so the app fills the viewport again. */
 
 /* ===== FLOATING THEME ICON (Preview Mode) - HIDDEN ===== */
 /* This is no longer used - preview button moves to bottom right instead */
@@ -724,7 +769,7 @@ body.theme-builder-active > .chat-container {
 /* ===== FLOATING SIDE PANELS (Presets & Saved) ===== */
 .gh-theme-builder__side-panel {
     position: fixed;
-    bottom: 120px;
+    bottom: 72px;
     left: 50%;
     transform: translateX(-50%) translateY(100%);
     background: rgba(20, 20, 20, 0.98);
@@ -733,7 +778,7 @@ body.theme-builder-active > .chat-container {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.1);
     padding: 16px;
     max-width: min(90vw, 600px);
-    max-height: 50vh;
+    max-height: max(96px, calc(var(--theme-builder-app-inset-bottom) - 104px));
     overflow-y: auto;
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
     opacity: 0;
@@ -1032,12 +1077,10 @@ body.theme-builder-active > .chat-container {
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
     :root {
-        --theme-builder-app-scale: 0.82;
-        --theme-builder-app-translate-y: 60px;
-    }
-
-    body.theme-builder-active > :not(.gh-theme-builder):not(main):not(#streaming-container):not(#gallery-container):not(.gh-header):not(.gh-search):not(.chat-container) {
-        transform-origin: center center;
+        --theme-builder-app-inset-top: 124px;
+        --theme-builder-app-inset-right: 76px;
+        --theme-builder-app-inset-bottom: 188px;
+        --theme-builder-app-inset-left: 80px;
     }
 
     .gh-theme-builder__floating-btn {
@@ -1170,9 +1213,9 @@ body.theme-builder-active > .chat-container {
     }
 
     .gh-theme-builder__side-panel {
-        bottom: 140px;
+        bottom: 76px;
         max-width: 95vw;
-        max-height: 60vh;
+        max-height: max(96px, calc(var(--theme-builder-app-inset-bottom) - 96px));
     }
 
     /* Harmony badge mobile adjustments */
@@ -1184,6 +1227,69 @@ body.theme-builder-active > .chat-container {
 
     .gh-theme-builder__harmony-badge::after {
         border-width: 5px;
+    }
+}
+
+@media (max-width: 480px) {
+    :root {
+        --theme-builder-app-inset-top: 116px;
+        --theme-builder-app-inset-right: 64px;
+        --theme-builder-app-inset-bottom: 172px;
+        --theme-builder-app-inset-left: 70px;
+    }
+
+    .gh-theme-builder__backdrop::after {
+        display: none;
+    }
+
+    .gh-theme-builder__name-panel {
+        max-width: calc(100vw - 190px - (var(--app-page-padding-x) * 2));
+    }
+
+    .gh-theme-builder__name-input {
+        max-width: 120px;
+    }
+
+    .gh-theme-builder__swatch,
+    .gh-theme-builder__swatch-preview {
+        width: 46px;
+        height: 46px;
+    }
+
+    .gh-theme-builder__action-btn {
+        width: 44px;
+        height: 44px;
+    }
+
+    body.theme-builder-active #app-shell {
+        --app-header-height: 40px;
+        --app-content-top: 40px;
+    }
+
+    body.theme-builder-active #app-shell .gh-header {
+        padding: 0 4px;
+    }
+
+    body.theme-builder-active #app-shell .gh-header__logo {
+        width: 18px;
+        height: 18px;
+    }
+
+    body.theme-builder-active #app-shell .gh-header__btn {
+        width: 28px;
+        min-width: 28px;
+        height: 28px;
+    }
+
+    body.theme-builder-active #app-shell .gh-header__btn svg {
+        width: 15px;
+        height: 15px;
+    }
+
+    body.theme-builder-active #app-shell .gh-header__sync-btn {
+        height: 26px;
+        padding: 0 6px;
+        font-size: 0.6rem;
     }
 }
 

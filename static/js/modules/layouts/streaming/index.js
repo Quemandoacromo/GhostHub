@@ -1121,6 +1121,10 @@ function _handleProgressUpdate(data) {
 
 let _isInitializing = false;
 
+function getLayoutMountTarget() {
+    return document.querySelector('#app-shell > main') || document.getElementById('app-shell') || document.body;
+}
+
 async function init() {
     if (_isInitializing) return;
     if (!isActive()) return;
@@ -1158,7 +1162,7 @@ async function init() {
         append(document.body, _initSpinner);
 
         _module.start();
-        await _module.mountRoot(document.body);
+        await _module.mountRoot(getLayoutMountTarget());
         _initSpinner.remove();
         _module.mountComponents();
         _module.wireEvents();

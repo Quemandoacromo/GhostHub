@@ -716,19 +716,46 @@ html {
     -webkit-text-size-adjust: 100%;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    height: 100%;
 }
 
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background-color: var(--background-color);
+    background-color: #000;
     color: var(--text-primary);
-    height: 100vh;
+    height: 100%;
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
     overscroll-behavior: none;
     user-select: none;
     /* Prevent text selection for a more native feel */
+}
+
+/*
+ * #app-shell wraps the visible app (header, search, main, chat) so the whole
+ * thing can be uniformly minimized into a rounded card by the theme builder.
+ * transform: translateZ(0) makes the shell a containing block for every
+ * position: fixed descendant — so all in-app fixed overlays (header, chat,
+ * media viewer, etc.) anchor to the shell and shrink with it. Modals/toasts/
+ * theme builder itself stay as body siblings and remain viewport-anchored.
+ */
+#app-shell {
+    position: fixed;
+    inset: 0;
+    background-color: var(--background-color);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transform: translateZ(0);
+    transition: inset 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                border-radius 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1;
+}
+
+#app-shell > main {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
 }
 
 /* Custom scrollbar for a more native look */

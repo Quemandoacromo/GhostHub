@@ -22,7 +22,7 @@
     position: fixed;
     top: var(--app-overlay-top-offset);
     right: var(--app-page-padding-x);
-    width: min(400px, calc(100vw - (var(--app-page-padding-x) * 2)));
+    width: min(400px, calc(100% - (var(--app-page-padding-x) * 2)));
     max-width: 400px;
     z-index: var(--app-shell-z-search);
     background: linear-gradient(180deg, rgba(24, 30, 42, 0.97) 0%, var(--search-surface) 100%);
@@ -81,7 +81,7 @@
 /* Search Results Dropdown */
 .gh-search__results {
     background: transparent;
-    max-height: calc(100vh - var(--app-overlay-top-offset) - var(--space-xl));
+    max-height: calc(100% - var(--app-overlay-top-offset) - var(--space-xl));
     overflow-y: auto;
 }
 

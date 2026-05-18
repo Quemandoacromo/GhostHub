@@ -279,7 +279,8 @@ export async function createGalleryContainer() {
         return existing;
     }
     const comp = new GalleryContainerComponent();
-    comp.mount(document.body);
+    const mountTarget = document.querySelector('#app-shell > main') || document.getElementById('app-shell') || document.body;
+    comp.mount(mountTarget);
     setContainer(comp.element);
     return comp.element;
 }

@@ -734,7 +734,7 @@ html.is-fullscreen .chat-container {
 @media (max-width: 480px) {
     .chat-container {
         /* Mobile: wider, still draggable */
-        width: calc(100vw - 24px);
+        width: calc(100% - 24px);
         max-width: 360px;
         min-width: 200px;
         resize: none;

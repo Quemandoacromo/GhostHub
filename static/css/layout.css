@@ -220,7 +220,7 @@
     padding-bottom: calc(var(--space-lg) + var(--safe-bottom));
     overflow-y: auto;
     overflow-x: hidden;
-    height: calc(100vh - var(--app-content-top));
+    height: 100%;
     -webkit-overflow-scrolling: touch;
     margin-top: 0;
     scrollbar-width: thin;

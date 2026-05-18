@@ -561,6 +561,10 @@ const _galleryLayoutModule = new GalleryLayoutModule();
 // Prevent double initialization
 let isInitializing = false;
 
+function getLayoutMountTarget() {
+    return document.querySelector('#app-shell > main') || document.getElementById('app-shell') || document.body;
+}
+
 // Thumbnail progress tracker — lifecycle owned via createThumbnailProgressTracker
 const thumbnailProgressTracker = createThumbnailProgressTracker({
     label: 'GalleryLayout',
@@ -665,7 +669,7 @@ async function init() {
         _galleryLayoutModule.start();
 
         // Create and mount gallery container via RAGOT
-        await _galleryLayoutModule.mountRoot(document.body);
+        await _galleryLayoutModule.mountRoot(getLayoutMountTarget());
         _initSpinner.remove();
 
         // Mount RAGOT Component children into their designated slots

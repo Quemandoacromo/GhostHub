@@ -140,7 +140,7 @@
     left: 50%;
     bottom: calc(20px + var(--safe-bottom));
     transform: translateX(-50%);
-    width: min(560px, calc(100vw - 24px));
+    width: min(560px, calc(100% - 24px));
     padding: 12px 14px;
     border-radius: var(--radius-md);
     border: 1px solid var(--border-color);
@@ -225,8 +225,8 @@
     left: 0;
     right: 0;
     bottom: 0;
-    height: calc(100vh - var(--app-content-top));
-    max-height: calc(100vh - var(--app-content-top));
+    height: calc(100% - var(--app-content-top));
+    max-height: calc(100% - var(--app-content-top));
     background: var(--background-color);
     z-index: var(--app-shell-z-content);
     view-transition-name: gh-active-layout;
