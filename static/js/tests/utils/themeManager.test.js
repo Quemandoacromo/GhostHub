@@ -398,7 +398,6 @@ describe('ThemeManager', () => {
               name: 'Apply Test',
               colors: {
                 primary: '#ff0000',
-                secondary: '#00ff00',
                 accent: '#0000ff',
                 background: '#121212',
                 surface: '#1e1e1e',
@@ -421,7 +420,6 @@ describe('ThemeManager', () => {
         setUIConfig({
           customThemeColors: {
             primary: '#abcdef',
-            secondary: '#fedcba',
             accent: '#123456',
             background: '#000000',
             surface: '#111111',
@@ -444,7 +442,6 @@ describe('ThemeManager', () => {
               name: 'CSS Test',
               colors: {
                 primary: '#ff5500',
-                secondary: '#5500ff',
                 accent: '#00ff55',
                 background: '#1a1a1a',
                 surface: '#2a2a2a',
@@ -462,6 +459,30 @@ describe('ThemeManager', () => {
         expect(root.style.getPropertyValue('--background-color')).toBe('#1a1a1a');
         expect(root.style.getPropertyValue('--text-primary')).toBe('#eeeeee');
       });
+
+      it('should ignore stale secondary fields in custom theme colors', () => {
+        setUIConfig({
+          customThemes: [
+            {
+              id: 'custom-ignore-secondary-test',
+              name: 'Ignore Secondary',
+              colors: {
+                primary: '#ff0000',
+                secondary: '#00ff00',
+                accent: '#0000ff',
+                background: '#1a1a1a',
+                surface: '#2a2a2a',
+                text: '#eeeeee'
+              }
+            }
+          ]
+        });
+
+        themeManager.applyTheme('custom-ignore-secondary-test');
+
+        expect(document.documentElement.style.getPropertyValue('--secondary-color')).toBe('');
+        expect(document.documentElement.style.getPropertyValue('--secondary-color-rgb')).toBe('');
+      });
     });
 
     describe('clearCustomThemeColors', () => {
@@ -474,7 +495,6 @@ describe('ThemeManager', () => {
               name: 'Clear Test',
               colors: {
                 primary: '#123456',
-                secondary: '#234567',
                 accent: '#345678',
                 background: '#456789',
                 surface: '#56789a',
@@ -508,7 +528,6 @@ describe('ThemeManager', () => {
               name: 'Init Test',
               colors: {
                 primary: '#aabbcc',
-                secondary: '#bbccdd',
                 accent: '#ccddee',
                 background: '#112233',
                 surface: '#223344',
@@ -518,7 +537,6 @@ describe('ThemeManager', () => {
           ],
           customThemeColors: {
             primary: '#aabbcc',
-            secondary: '#bbccdd',
             accent: '#ccddee',
             background: '#112233',
             surface: '#223344',

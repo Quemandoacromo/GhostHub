@@ -6,6 +6,11 @@
 
 import { bus, $ } from '../libs/ragot.esm.min.js';
 import { APP_EVENTS } from '../core/appEvents.js';
+import {
+    getThemeCssVariables,
+    normalizeThemeColors,
+    THEME_CSS_VARIABLE_KEYS
+} from './themeColors.js';
 
 function getRuntimeConfig() {
     return window.ragotModules?.appStore?.get?.('config', {}) || {};
@@ -238,79 +243,11 @@ function applyTheme(themeId, updateConfig = true) {
  */
 function applyCustomThemeColors(colors) {
     const root = document.documentElement;
+    const resolvedColors = normalizeThemeColors(colors);
 
-    // Helper functions
-    const hexToRgb = (hex) => {
-        hex = hex.replace('#', '');
-        if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
-        return [parseInt(hex.substr(0, 2), 16), parseInt(hex.substr(2, 2), 16), parseInt(hex.substr(4, 2), 16)];
-    };
-
-    const hexToHsl = (hex) => {
-        const [r, g, b] = hexToRgb(hex).map(x => x / 255);
-        const max = Math.max(r, g, b), min = Math.min(r, g, b);
-        let h, s, l = (max + min) / 2;
-        if (max === min) { h = s = 0; }
-        else {
-            const d = max - min;
-            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-            switch (max) {
-                case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
-                case g: h = ((b - r) / d + 2) / 6; break;
-                case b: h = ((r - g) / d + 4) / 6; break;
-            }
-        }
-        return [h * 360, s * 100, l * 100];
-    };
-
-    const hslToHex = (h, s, l) => {
-        h /= 360; s /= 100; l /= 100;
-        let r, g, b;
-        if (s === 0) { r = g = b = l; }
-        else {
-            const hue2rgb = (p, q, t) => {
-                if (t < 0) t += 1; if (t > 1) t -= 1;
-                if (t < 1 / 6) return p + (q - p) * 6 * t;
-                if (t < 1 / 2) return q;
-                if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-                return p;
-            };
-            const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-            const p = 2 * l - q;
-            r = hue2rgb(p, q, h + 1 / 3);
-            g = hue2rgb(p, q, h);
-            b = hue2rgb(p, q, h - 1 / 3);
-        }
-        return '#' + [r, g, b].map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join('');
-    };
-
-    const lighten = (hex, pct) => { const [h, s, l] = hexToHsl(hex); return hslToHex(h, s, Math.min(100, l + pct)); };
-    const darken = (hex, pct) => { const [h, s, l] = hexToHsl(hex); return hslToHex(h, s, Math.max(0, l - pct)); };
-    const rgbStr = (hex) => hexToRgb(hex).join(', ');
-    const setAlpha = (hex, a) => { const [r, g, b] = hexToRgb(hex); return `rgba(${r}, ${g}, ${b}, ${a})`; };
-
-    // Apply colors
-    root.style.setProperty('--primary-color', colors.primary);
-    root.style.setProperty('--primary-color-light', lighten(colors.primary, 15));
-    root.style.setProperty('--primary-color-dark', darken(colors.primary, 15));
-    root.style.setProperty('--secondary-color', colors.secondary);
-    root.style.setProperty('--accent-color', colors.accent);
-    root.style.setProperty('--accent-color-light', lighten(colors.accent, 15));
-    root.style.setProperty('--background-color', colors.background);
-    root.style.setProperty('--background-color-dark', darken(colors.background, 5));
-    root.style.setProperty('--background-color-light', lighten(colors.background, 10));
-    root.style.setProperty('--surface-color', colors.surface);
-    root.style.setProperty('--text-primary', colors.text);
-    root.style.setProperty('--text-secondary', setAlpha(colors.text, 0.7));
-    root.style.setProperty('--text-tertiary', setAlpha(colors.text, 0.5));
-    root.style.setProperty('--card-background', colors.surface);
-    root.style.setProperty('--card-hover', lighten(colors.surface, 10));
-    root.style.setProperty('--overlay-color', setAlpha(colors.background, 0.8));
-    root.style.setProperty('--primary-color-rgb', rgbStr(colors.primary));
-    root.style.setProperty('--secondary-color-rgb', rgbStr(colors.secondary));
-    root.style.setProperty('--accent-color-rgb', rgbStr(colors.accent));
-    root.style.setProperty('--surface-color-rgb', rgbStr(colors.surface));
-    root.style.setProperty('--background-color-rgb', rgbStr(colors.background));
+    Object.entries(getThemeCssVariables(resolvedColors)).forEach(([property, value]) => {
+        root.style.setProperty(property, value);
+    });
 }
 
 /**
@@ -318,16 +255,7 @@ function applyCustomThemeColors(colors) {
  */
 function clearCustomThemeColors() {
     const root = document.documentElement;
-    const props = [
-        '--primary-color', '--primary-color-light', '--primary-color-dark',
-        '--secondary-color', '--accent-color', '--accent-color-light',
-        '--background-color', '--background-color-dark', '--background-color-light',
-        '--surface-color', '--text-primary', '--text-secondary', '--text-tertiary',
-        '--card-background', '--card-hover', '--overlay-color',
-        '--primary-color-rgb', '--secondary-color-rgb', '--accent-color-rgb',
-        '--surface-color-rgb', '--background-color-rgb'
-    ];
-    props.forEach(p => root.style.removeProperty(p));
+    THEME_CSS_VARIABLE_KEYS.forEach(property => root.style.removeProperty(property));
 }
 
 /**

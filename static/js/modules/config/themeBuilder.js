@@ -4,10 +4,24 @@
  */
 
 import { saveConfig } from '../../utils/configManager.js';
-import { saveUserPreference } from '../../utils/userPreferences.js';
+import { getUserPreference, saveUserPreference } from '../../utils/userPreferences.js';
 import { $, $$, Component, createElement, attr, bus } from '../../libs/ragot.esm.min.js';
 import { APP_EVENTS } from '../../core/appEvents.js';
 import { toast, dialog } from '../../utils/notificationManager.js';
+import { trashIcon, xIcon, diskIcon, eyeIcon, chevronDownIcon } from '../../utils/icons.js';
+import {
+    DEFAULT_THEME_COLORS,
+    getThemeCssVariables,
+    hexToHsl,
+    hexToRgb,
+    hslToHex,
+    normalizeThemeColors,
+    normalizeToHex,
+    rgbToHex,
+    sanitizeThemeRecord
+} from '../../utils/themeColors.js';
+
+let configModalFocusControlsPromise = null;
 
 function getRuntimeConfig() {
     return window.ragotModules?.appStore?.get?.('config', {}) || {};
@@ -20,13 +34,11 @@ function buildConfigWithUI() {
     return nextConfig;
 }
 
-// Color keys that can be customized
-const COLOR_KEYS = [
-    { key: 'primary', name: 'Primary', description: 'Main brand color for headers and key UI elements' },
-    { key: 'secondary', name: 'Secondary', description: 'Supporting color for gradients and accents' },
-    { key: 'accent', name: 'Accent', description: 'Highlight color for buttons and interactive elements' },
+const EDITOR_COLOR_KEYS = [
+    { key: 'primary', name: 'Header', description: 'Header and primary brand surfaces' },
+    { key: 'accent', name: 'Action', description: 'Buttons, active states, focus rings, and highlights' },
     { key: 'background', name: 'Background', description: 'Main page background color' },
-    { key: 'surface', name: 'Surface', description: 'Card and panel backgrounds' },
+    { key: 'surface', name: 'Panels', description: 'Card, modal, and panel backgrounds' },
     { key: 'text', name: 'Text', description: 'Primary text color' }
 ];
 
@@ -35,62 +47,62 @@ const PRESET_PALETTES = [
     {
         id: 'cyberpunk',
         name: 'Cyberpunk',
-        colors: { primary: '#ff006e', secondary: '#fb5607', accent: '#ffbe0b', background: '#0a0e27', surface: '#1a1f3a', text: '#f0f3ff' }
+        colors: { primary: '#ff006e', accent: '#ffbe0b', background: '#0a0e27', surface: '#1a1f3a', text: '#f0f3ff' }
     },
     {
         id: 'ocean-breeze',
         name: 'Ocean Breeze',
-        colors: { primary: '#0077b6', secondary: '#0096c7', accent: '#00b4d8', background: '#03045e', surface: '#023e8a', text: '#caf0f8' }
+        colors: { primary: '#0077b6', accent: '#00b4d8', background: '#03045e', surface: '#023e8a', text: '#caf0f8' }
     },
     {
         id: 'sunset-glow',
         name: 'Sunset Glow',
-        colors: { primary: '#d62828', secondary: '#f77f00', accent: '#fcbf49', background: '#1a1423', surface: '#2d1b3d', text: '#fef6e4' }
+        colors: { primary: '#d62828', accent: '#fcbf49', background: '#1a1423', surface: '#2d1b3d', text: '#fef6e4' }
     },
     {
         id: 'forest-night',
         name: 'Forest Night',
-        colors: { primary: '#2d6a4f', secondary: '#40916c', accent: '#52b788', background: '#081c15', surface: '#1b4332', text: '#d8f3dc' }
+        colors: { primary: '#2d6a4f', accent: '#52b788', background: '#081c15', surface: '#1b4332', text: '#d8f3dc' }
     },
     {
         id: 'neon-dreams',
         name: 'Neon Dreams',
-        colors: { primary: '#7209b7', secondary: '#b5179e', accent: '#f72585', background: '#10002b', surface: '#240046', text: '#e0aaff' }
+        colors: { primary: '#7209b7', accent: '#f72585', background: '#10002b', surface: '#240046', text: '#e0aaff' }
     },
     {
         id: 'golden-hour',
         name: 'Golden Hour',
-        colors: { primary: '#c77dff', secondary: '#e0aaff', accent: '#ffd60a', background: '#1a0033', surface: '#3c096c', text: '#f9f6ff' }
+        colors: { primary: '#c77dff', accent: '#ffd60a', background: '#1a0033', surface: '#3c096c', text: '#f9f6ff' }
     },
     {
         id: 'arctic-aurora',
         name: 'Arctic Aurora',
-        colors: { primary: '#06ffa5', secondary: '#00d9ff', accent: '#fffb00', background: '#001233', surface: '#002855', text: '#f0f9ff' }
+        colors: { primary: '#06ffa5', accent: '#fffb00', background: '#001233', surface: '#002855', text: '#f0f9ff' }
     },
     {
         id: 'cherry-blossom',
         name: 'Cherry Blossom',
-        colors: { primary: '#ff85a1', secondary: '#ff6289', accent: '#ffc2d1', background: '#2b1320', surface: '#4a1f35', text: '#ffe5ec' }
+        colors: { primary: '#ff85a1', accent: '#ffc2d1', background: '#2b1320', surface: '#4a1f35', text: '#ffe5ec' }
     },
     {
         id: 'electric-lime',
         name: 'Electric Lime',
-        colors: { primary: '#84cc16', secondary: '#a3e635', accent: '#bef264', background: '#14120b', surface: '#2c2915', text: '#f7fee7' }
+        colors: { primary: '#84cc16', accent: '#bef264', background: '#14120b', surface: '#2c2915', text: '#f7fee7' }
     },
     {
         id: 'cosmic-purple',
         name: 'Cosmic Purple',
-        colors: { primary: '#9333ea', secondary: '#a855f7', accent: '#d946ef', background: '#1e0a3c', surface: '#3b1c6d', text: '#f5e6ff' }
+        colors: { primary: '#9333ea', accent: '#d946ef', background: '#1e0a3c', surface: '#3b1c6d', text: '#f5e6ff' }
     },
     {
         id: 'volcano-red',
         name: 'Volcano Red',
-        colors: { primary: '#dc2626', secondary: '#ef4444', accent: '#fb923c', background: '#1c0b0b', surface: '#3d1414', text: '#fee2e2' }
+        colors: { primary: '#dc2626', accent: '#fb923c', background: '#1c0b0b', surface: '#3d1414', text: '#fee2e2' }
     },
     {
         id: 'sapphire-sky',
         name: 'Sapphire Sky',
-        colors: { primary: '#1e40af', secondary: '#3b82f6', accent: '#60a5fa', background: '#0c1428', surface: '#1e293b', text: '#dbeafe' }
+        colors: { primary: '#1e40af', accent: '#60a5fa', background: '#0c1428', surface: '#1e293b', text: '#dbeafe' }
     }
 ];
 
@@ -105,7 +117,7 @@ let originalColors = null; // Store original colors for revert on cancel
 let customThemes = [];
 let colorFormat = 'hex'; // hex, rgb, hsl
 let isOpen = false;
-let wasSaved = false; // Track if user saved changes
+let originalThemeId = null;
 
 // Undo/Redo state
 let colorHistory = []; // Array of color states
@@ -125,6 +137,42 @@ function setThemeBuilderViewportState(mode = 'closed') {
     root.classList.toggle('theme-builder-preview', mode === 'preview');
     body.classList.toggle('theme-builder-active', mode === 'edit');
     body.classList.toggle('theme-builder-preview', mode === 'preview');
+}
+
+function notifyThemeBuilderOpened() {
+    document.dispatchEvent(new CustomEvent('ghosthub:theme-builder-opened'));
+}
+
+function notifyThemeBuilderClosed() {
+    document.dispatchEvent(new CustomEvent('ghosthub:theme-builder-closed'));
+}
+
+function suspendUnderlyingConfigModal() {
+    const configModal = document.getElementById('config-modal');
+    if (!configModal || configModal.classList.contains('hidden')) return;
+    configModal.dataset.themeBuilderSuspended = 'true';
+    configModal.setAttribute('inert', '');
+    configModal.setAttribute('aria-hidden', 'true');
+}
+
+function resumeUnderlyingConfigModal() {
+    const configModal = document.getElementById('config-modal');
+    if (!configModal || configModal.dataset.themeBuilderSuspended !== 'true') return;
+    delete configModal.dataset.themeBuilderSuspended;
+    configModal.removeAttribute('inert');
+    configModal.removeAttribute('aria-hidden');
+}
+
+async function withConfigModalFocusControls(callbackName) {
+    try {
+        if (!configModalFocusControlsPromise) {
+            configModalFocusControlsPromise = import('./modal.js');
+        }
+        const modal = await configModalFocusControlsPromise;
+        modal?.[callbackName]?.();
+    } catch (error) {
+        console.warn(`[ThemeBuilder] Failed to ${callbackName}:`, error);
+    }
 }
 
 class ThemeBuilderComponent extends Component {
@@ -173,28 +221,13 @@ function loadCustomThemes() {
     const saved = getRuntimeConfig()?.javascript_config?.ui?.customThemes;
     console.log('[ThemeBuilder] Raw customThemes from config:', saved);
 
-    // Deep clone to avoid reference issues
+    // Deep clone and normalize to avoid carrying stale theme fields forward.
     if (Array.isArray(saved) && saved.length > 0) {
-        customThemes = JSON.parse(JSON.stringify(saved));
+        customThemes = JSON.parse(JSON.stringify(saved)).map(sanitizeThemeRecord);
     } else {
         customThemes = [];
     }
     console.log('[ThemeBuilder] After load, customThemes array:', customThemes.length, customThemes.map(t => t.name));
-}
-
-/**
- * Save custom themes to config
- */
-async function saveCustomThemes() {
-    const nextConfig = buildConfigWithUI();
-    nextConfig.javascript_config.ui.customThemes = customThemes;
-
-    try {
-        await saveConfig(nextConfig);
-        console.log('Custom themes saved');
-    } catch (err) {
-        console.error('Failed to save custom themes:', err);
-    }
 }
 
 /**
@@ -217,100 +250,108 @@ function createThemeBuilderModal(owner) {
             </svg>
         </button>
 
-        <!-- Top Left: Theme Name -->
-        <div class="gh-theme-builder__name-panel">
-            <input type="text" id="gh-theme-builder__name-input" class="gh-theme-builder__name-input" placeholder="My Custom Theme" maxlength="30">
-        </div>
-
-        <!-- Left Side: Color Swatches (Vertical) -->
-        <div class="gh-theme-builder__swatches" id="gh-theme-builder__swatches"></div>
-
-        <!-- Right Side: Quick Actions (Vertical) -->
-        <div class="gh-theme-builder__actions">
-            <button class="gh-theme-builder__action-btn" id="btn-undo" disabled title="Undo">
-                <div class="gh-theme-builder__action-label">Undo</div>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 7v6h6"/>
-                    <path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/>
-                </svg>
-            </button>
-            <button class="gh-theme-builder__action-btn" id="btn-redo" disabled title="Redo">
-                <div class="gh-theme-builder__action-label">Redo</div>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 7v6h-6"/>
-                    <path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/>
-                </svg>
-            </button>
-            <button class="gh-theme-builder__action-btn" id="btn-randomize">
-                <div class="gh-theme-builder__action-label">Random Colors</div>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                </svg>
-                <span class="gh-theme-builder__harmony-badge" id="gh-theme-builder__harmony-badge"></span>
-            </button>
-            <button class="gh-theme-builder__action-btn" id="btn-invert">
-                <div class="gh-theme-builder__action-label">Invert Theme</div>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <path d="M12 2v20"/>
-                </svg>
-            </button>
-        </div>
-
-        <!-- Bottom Left: Format Toggle -->
-        <div class="gh-theme-builder__format">
-            <div class="gh-theme-builder__format-toggle">
-                <button class="gh-theme-builder__format-btn active" data-format="hex">HEX</button>
-                <button class="gh-theme-builder__format-btn" data-format="rgb">RGB</button>
+        <div class="gh-theme-builder__top-controls">
+            <div class="gh-theme-builder__name-panel">
+                <input type="text" id="gh-theme-builder__name-input" class="gh-theme-builder__name-input" placeholder="My Custom Theme" maxlength="30">
+            </div>
+            <div class="gh-theme-builder__save-panel">
+                <button class="btn btn--secondary gh-theme-builder__cancel-btn" id="btn-cancel">
+                    ${xIcon(18)}
+                    Cancel
+                </button>
+                <button class="btn btn--primary gh-theme-builder__save-btn" id="btn-save">
+                    ${diskIcon(18)}
+                    Save
+                </button>
             </div>
         </div>
 
-        <!-- Bottom Center: Panel Toggles -->
-        <div class="gh-theme-builder__panel-toggles">
-            <button class="gh-theme-builder__panel-toggle" id="toggle-presets">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="7" height="7"/>
-                    <rect x="14" y="3" width="7" height="7"/>
-                    <rect x="3" y="14" width="7" height="7"/>
-                    <rect x="14" y="14" width="7" height="7"/>
-                </svg>
-                Presets
-            </button>
-            <button class="gh-theme-builder__panel-toggle" id="toggle-saved">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
-                </svg>
-                Saved (<span id="saved-count-inline">0</span>)
-            </button>
-        </div>
-
-        <!-- Top Right: Save & Cancel -->
-        <div class="gh-theme-builder__save-panel">
-            <button class="gh-theme-builder__cancel-btn" id="btn-cancel">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-                Cancel
-            </button>
-            <button class="gh-theme-builder__save-btn" id="btn-save">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                    <polyline points="17 21 17 13 7 13 7 21"/>
-                    <polyline points="7 3 7 8 15 8"/>
-                </svg>
-                Save
-            </button>
-        </div>
-
-        <!-- Bottom Right: Preview Button (standalone) -->
-        <button class="gh-theme-builder__preview-btn" id="btn-preview" title="Toggle Preview Mode">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/>
-                <circle cx="12" cy="12" r="3"/>
-            </svg>
+        <button class="btn btn--secondary gh-theme-builder__preview-btn" id="btn-preview" title="Toggle Preview Mode">
+            ${eyeIcon(18)}
             <span class="gh-theme-builder__preview-label">Preview</span>
         </button>
+
+        <!-- Bottom Dock: editing tools only -->
+        <div class="gh-theme-builder__dock">
+            <button class="btn btn--secondary gh-theme-builder__dock-nav gh-theme-builder__dock-nav--prev" id="btn-dock-prev" type="button" aria-label="Previous theme controls">
+                ${chevronDownIcon(22)}
+            </button>
+            <div class="gh-theme-builder__dock-scroll" aria-label="Theme editing controls">
+                <div class="gh-theme-builder__dock-page gh-theme-builder__dock-page--swatches">
+                    <div class="gh-theme-builder__dock-cluster gh-theme-builder__dock-cluster--swatches">
+                        <div class="gh-theme-builder__swatches" id="gh-theme-builder__swatches"></div>
+                    </div>
+                </div>
+
+                <div class="gh-theme-builder__dock-page gh-theme-builder__dock-page--tools">
+                    <div class="gh-theme-builder__actions gh-theme-builder__dock-cluster">
+                        <button class="btn btn--secondary gh-theme-builder__action-btn" id="btn-undo" disabled title="Undo">
+                            <div class="gh-theme-builder__action-label">Undo</div>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 7v6h6"/>
+                                <path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/>
+                            </svg>
+                        </button>
+                        <button class="btn btn--secondary gh-theme-builder__action-btn" id="btn-redo" disabled title="Redo">
+                            <div class="gh-theme-builder__action-label">Redo</div>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 7v6h-6"/>
+                                <path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="gh-theme-builder__dock-divider" aria-hidden="true"></div>
+                    <div class="gh-theme-builder__color-tools gh-theme-builder__dock-cluster">
+                        <button class="btn btn--secondary gh-theme-builder__action-btn" id="btn-randomize" title="Random Colors">
+                            <div class="gh-theme-builder__action-label">Random Colors</div>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                            </svg>
+                        </button>
+                        <button class="btn btn--secondary gh-theme-builder__action-btn" id="btn-invert" title="Invert Theme">
+                            <div class="gh-theme-builder__action-label">Invert Theme</div>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 2v20"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="gh-theme-builder__dock-page gh-theme-builder__dock-page--library">
+                    <div class="gh-theme-builder__panel-toggles gh-theme-builder__dock-cluster">
+                        <button class="btn btn--secondary gh-theme-builder__panel-toggle" id="toggle-presets">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="7" height="7"/>
+                                <rect x="14" y="3" width="7" height="7"/>
+                                <rect x="3" y="14" width="7" height="7"/>
+                                <rect x="14" y="14" width="7" height="7"/>
+                            </svg>
+                            <span class="gh-theme-builder__panel-label">Presets</span>
+                        </button>
+                        <button class="btn btn--secondary gh-theme-builder__panel-toggle" id="toggle-saved">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                            </svg>
+                            <span class="gh-theme-builder__panel-label">Saved</span>
+                            <span id="saved-count-inline">0</span>
+                        </button>
+                    </div>
+                    <div class="gh-theme-builder__dock-divider" aria-hidden="true"></div>
+                    <div class="gh-theme-builder__format gh-theme-builder__dock-cluster">
+                        <div class="gh-theme-builder__format-toggle">
+                            <button class="btn btn--secondary gh-theme-builder__format-btn active" data-format="hex">HEX</button>
+                            <button class="btn btn--secondary gh-theme-builder__format-btn" data-format="rgb">RGB</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <button class="btn btn--secondary gh-theme-builder__dock-nav gh-theme-builder__dock-nav--next" id="btn-dock-next" type="button" aria-label="Next theme controls">
+                ${chevronDownIcon(22)}
+            </button>
+        </div>
+
+        <div class="gh-theme-builder__harmony-popover" id="gh-theme-builder__harmony-popover" aria-live="polite"></div>
 
         <!-- Floating Panel: Presets -->
         <div class="gh-theme-builder__side-panel" id="presets-panel">
@@ -326,8 +367,9 @@ function createThemeBuilderModal(owner) {
             </div>
             <div class="gh-theme-builder__saved-list" id="gh-theme-builder__saved-list"></div>
             <div class="gh-theme-builder__io-actions">
-                <button class="gh-theme-builder__io-btn" id="btn-export">Export JSON</button>
-                <button class="gh-theme-builder__io-btn" id="btn-import">Import JSON</button>
+                <button class="btn btn--secondary gh-theme-builder__io-btn" id="btn-export">Export JSON</button>
+                <button class="btn btn--secondary gh-theme-builder__io-btn" id="btn-import">Import JSON</button>
+                <button class="btn btn--secondary gh-theme-builder__io-btn" id="btn-import-clipboard">Paste JSON</button>
             </div>
         </div>
     ` });
@@ -369,7 +411,7 @@ function renderColorSwatches() {
     const container = $('#gh-theme-builder__swatches');
     if (!container) return;
 
-    container.innerHTML = COLOR_KEYS.map(({ key, name }) => {
+    container.innerHTML = EDITOR_COLOR_KEYS.map(({ key, name }) => {
         const color = currentColors[key] || '#000000';
         return `
             <div class="gh-theme-builder__swatch" data-color-key="${key}">
@@ -384,27 +426,49 @@ function renderColorSwatches() {
     // Add event listeners
     $$('input[type="color"]', container).forEach(input => {
         let startColor = null;
+        let hasCommittedSwatchChange = false;
+        const beginSwatchSession = () => {
+            startColor = currentColors[input.dataset.key];
+            hasCommittedSwatchChange = false;
+        };
+        const captureStartColor = () => {
+            if (startColor === null) beginSwatchSession();
+        };
+        const resetSwatchSession = () => {
+            startColor = null;
+            hasCommittedSwatchChange = false;
+        };
+        const applySwatchColor = (target) => {
+            const key = target.dataset.key;
+            currentColors[key] = target.value;
+            // Update the swatch background
+            target.closest('.gh-theme-builder__swatch-preview').style.background = target.value;
+            // Apply live to document
+            applyColorsToDocument(currentColors);
+        };
 
         attr(input, {
-            onMousedown: () => {
-                startColor = currentColors[input.dataset.key];
-            },
-            onTouchstart: () => {
-                startColor = currentColors[input.dataset.key];
-            },
+            onMousedown: beginSwatchSession,
+            onTouchstart: beginSwatchSession,
+            onFocus: captureStartColor,
+            onBlur: resetSwatchSession,
             onInput: (e) => {
-                const key = e.target.dataset.key;
-                currentColors[key] = e.target.value;
-                // Update the swatch background
-                e.target.closest('.gh-theme-builder__swatch-preview').style.background = e.target.value;
-                // Apply live to document
-                applyColorsToDocument(currentColors);
+                captureStartColor();
+                applySwatchColor(e.target);
             },
             onChange: (e) => {
-                if (startColor !== currentColors[e.target.dataset.key]) {
-                    pushToHistory(currentColors);
-                    // Clear theme name when user manually changes colors
-                    clearThemeNameIfNeeded('Manual color change');
+                const previousColor = startColor ?? currentColors[e.target.dataset.key];
+                applySwatchColor(e.target);
+
+                if (normalizeToHex(previousColor) !== normalizeToHex(e.target.value)) {
+                    if (hasCommittedSwatchChange) {
+                        replaceCurrentHistory(currentColors);
+                    } else {
+                        pushToHistory(currentColors);
+                        hasCommittedSwatchChange = true;
+                        // Clear theme name when user manually changes colors
+                        clearThemeNameIfNeeded('Manual color change');
+                    }
                 }
             }
         });
@@ -445,6 +509,32 @@ function setupEventListeners(overlay, owner = null) {
     on($('#btn-randomize', overlay), 'click', randomizeColors);
     on($('#btn-invert', overlay), 'click', invertColors);
 
+    const dockScroll = $('.gh-theme-builder__dock-scroll', overlay);
+    const dockPrev = $('#btn-dock-prev', overlay);
+    const dockNext = $('#btn-dock-next', overlay);
+    const dockPages = $$('.gh-theme-builder__dock-page', overlay);
+    const updateDockNav = () => {
+        if (!dockScroll || dockPages.length === 0) return;
+        const pageWidth = dockScroll.clientWidth || 1;
+        const pageIndex = Math.round(dockScroll.scrollLeft / pageWidth);
+        dockPrev?.classList.toggle('disabled', pageIndex <= 0);
+        dockNext?.classList.toggle('disabled', pageIndex >= dockPages.length - 1);
+        dockPrev?.setAttribute('aria-disabled', pageIndex <= 0 ? 'true' : 'false');
+        dockNext?.setAttribute('aria-disabled', pageIndex >= dockPages.length - 1 ? 'true' : 'false');
+    };
+    const scrollDockPage = (direction) => {
+        if (!dockScroll || dockPages.length === 0) return;
+        const pageWidth = dockScroll.clientWidth;
+        const currentIndex = Math.round(dockScroll.scrollLeft / pageWidth);
+        const nextIndex = Math.max(0, Math.min(dockPages.length - 1, currentIndex + direction));
+        dockScroll.scrollTo({ left: nextIndex * pageWidth, behavior: 'smooth' });
+        owner.timeout(updateDockNav, 220);
+    };
+    on(dockPrev, 'click', () => scrollDockPage(-1));
+    on(dockNext, 'click', () => scrollDockPage(1));
+    on(dockScroll, 'scroll', updateDockNav);
+    updateDockNav();
+
     // Color format toggle
     $$('.gh-theme-builder__format-btn', overlay).forEach(btn => {
         on(btn, 'click', (e) => {
@@ -458,6 +548,7 @@ function setupEventListeners(overlay, owner = null) {
     // Export/Import
     on($('#btn-export', overlay), 'click', exportTheme);
     on($('#btn-import', overlay), 'click', importTheme);
+    on($('#btn-import-clipboard', overlay), 'click', importThemeFromClipboard);
 
     // Panel toggles
     const presetsPanel = $('#presets-panel', overlay);
@@ -481,16 +572,6 @@ function setupEventListeners(overlay, owner = null) {
         }
     });
 
-    // Click outside panels to close them
-    on(overlay, 'click', (e) => {
-        if (!e.target.closest('.gh-theme-builder__side-panel') &&
-            !e.target.closest('.gh-theme-builder__panel-toggle') &&
-            !e.target.closest('.gh-theme-builder')) {
-            presetsPanel?.classList.remove('active');
-            savedPanel?.classList.remove('active');
-        }
-    });
-
     // Floating theme icon click - reopen theme builder
     const floatingIcon = $('#gh-theme-builder__floating-btn', overlay);
     on(floatingIcon, 'click', (e) => {
@@ -502,6 +583,7 @@ function setupEventListeners(overlay, owner = null) {
     const backdrop = $('#gh-theme-builder__backdrop', overlay);
     on(backdrop, 'click', (e) => {
         e.stopPropagation();
+        closeThemeLibraryPanels();
         enterPreviewMode();
     });
     on(document, 'keydown', handleKeyDown);
@@ -571,6 +653,16 @@ function togglePreviewMode() {
     }
 }
 
+function closeThemeLibraryPanels() {
+    const overlay = $('.gh-theme-builder');
+    if (!overlay) return;
+
+    $('#presets-panel', overlay)?.classList.remove('active');
+    $('#saved-panel', overlay)?.classList.remove('active');
+    $('#toggle-presets', overlay)?.classList.remove('active');
+    $('#toggle-saved', overlay)?.classList.remove('active');
+}
+
 /**
  * Enter preview mode - hides controls but keeps preview button visible
  * User can test the theme by interacting with the app at full size
@@ -578,10 +670,17 @@ function togglePreviewMode() {
 function enterPreviewMode() {
     const overlay = $('.gh-theme-builder');
     if (overlay) {
+        closeThemeLibraryPanels();
         isOpen = false;
         overlay.classList.remove('active'); // Remove active class to allow clicks through
         overlay.classList.add('preview-mode');
         setThemeBuilderViewportState('preview');
+        // Re-enable the underlying config modal so the user can interact with it
+        // through the preview viewport (undoes the inert/focus-trap suspension
+        // that exitPreviewMode/openThemeBuilder applied when entering edit mode).
+        resumeUnderlyingConfigModal();
+        notifyThemeBuilderClosed();
+        withConfigModalFocusControls('resumeConfigModalFocusTrap');
     }
 }
 
@@ -591,6 +690,9 @@ function enterPreviewMode() {
 function exitPreviewMode() {
     const overlay = $('.gh-theme-builder');
     if (overlay) {
+        notifyThemeBuilderOpened();
+        suspendUnderlyingConfigModal();
+        withConfigModalFocusControls('suspendConfigModalFocusTrap');
         isOpen = true;
         overlay.classList.remove('preview-mode');
         overlay.classList.add('active');
@@ -604,14 +706,13 @@ function exitPreviewMode() {
 function initializeColors() {
     const style = getComputedStyle(document.documentElement);
 
-    currentColors = {
+    currentColors = buildThemeColors({
         primary: style.getPropertyValue('--primary-color').trim() || '#2d3250',
-        secondary: style.getPropertyValue('--secondary-color').trim() || '#424874',
         accent: style.getPropertyValue('--accent-color').trim() || '#f05454',
         background: style.getPropertyValue('--background-color').trim() || '#121212',
         surface: style.getPropertyValue('--surface-color').trim() || '#1e1e2e',
         text: style.getPropertyValue('--text-primary').trim() || '#ffffff'
-    };
+    }, DEFAULT_THEME_COLORS);
 }
 
 /**
@@ -621,14 +722,22 @@ function renderPresets() {
     const container = $('#gh-theme-builder__preset-grid');
     if (!container) return;
 
-    container.innerHTML = PRESET_PALETTES.map(preset => `
-        <div class="gh-theme-builder__preset-item"
+    container.innerHTML = PRESET_PALETTES.map(preset => {
+        const chips = ['primary', 'accent', 'surface', 'background'].map(key => (
+            `<div style="background: ${preset.colors[key]}"></div>`
+        )).join('');
+
+        return `
+        <button class="btn btn--secondary gh-theme-builder__preset-item"
+             type="button"
              data-preset="${preset.id}"
-             title="${preset.name}"
-             style="--preset-bg: ${preset.colors.background}; --preset-accent: ${preset.colors.accent}">
-            <span class="gh-theme-builder__preset-checkmark"></span>
-        </div>
-    `).join('');
+             title="${preset.name}">
+            <span class="gh-theme-builder__preset-checkmark" aria-hidden="true"></span>
+            <div class="gh-theme-builder__swatches" aria-hidden="true">${chips}</div>
+            <span class="gh-theme-builder__preset-name">${preset.name}</span>
+        </button>
+    `;
+    }).join('');
 
     // Add click handlers
     $$('.gh-theme-builder__preset-item', container).forEach(btn => {
@@ -637,7 +746,7 @@ function renderPresets() {
                 const presetId = btn.dataset.preset;
             const preset = PRESET_PALETTES.find(p => p.id === presetId);
             if (preset) {
-                currentColors = { ...preset.colors };
+                currentColors = buildThemeColors(preset.colors);
                 renderColorSwatches(); // Re-render compact swatches
 
                 // Apply live to document for preview
@@ -661,134 +770,6 @@ function renderPresets() {
             }
         });
     });
-}
-
-/**
- * Render color picker controls
- */
-function renderColorPickers() {
-    const container = $('#tb-color-pickers');
-    if (!container) return;
-
-    container.innerHTML = COLOR_KEYS.map(({ key, name, description }) => {
-        const color = currentColors[key] || '#000000';
-        const displayValue = formatColor(color, colorFormat);
-
-        return `
-            <div class="tb-color-group" data-color-key="${key}">
-                <div class="tb-color-label">
-                    <span class="tb-color-name" title="${description}">${name}</span>
-                    <span class="tb-color-value" title="Click to copy">${displayValue}</span>
-                </div>
-                <div class="tb-color-picker-wrapper">
-                    <div class="tb-color-preview" style="background: ${color}">
-                        <input type="color" value="${normalizeToHex(color)}" data-key="${key}">
-                    </div>
-                    <input type="text" class="tb-color-input" value="${displayValue}" data-key="${key}">
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    // Add event listeners
-    $$('input[type="color"]', container).forEach(input => {
-        attr(input, {
-            onInput: (e) => {
-                const key = e.target.dataset.key;
-                currentColors[key] = e.target.value;
-                updateColorGroup(key);
-                updatePreview();
-                // Apply live to document
-                applyColorsToDocument(currentColors);
-            }
-        });
-    });
-
-    $$('.tb-color-input', container).forEach(input => {
-        attr(input, {
-            onChange: (e) => {
-                const key = e.target.dataset.key;
-                const parsed = parseColor(e.target.value);
-                if (parsed) {
-                    currentColors[key] = parsed;
-                    updateColorGroup(key);
-                    updatePreview();
-                    // Apply live to document
-                    applyColorsToDocument(currentColors);
-                }
-            }
-        });
-    });
-
-    // Copy to clipboard on value click
-    $$('.tb-color-value', container).forEach(span => {
-        attr(span, {
-            onClick: () => {
-                navigator.clipboard.writeText(span.textContent);
-                const original = span.textContent;
-                span.textContent = 'Copied!';
-                setTimeout(() => span.textContent = original, 1000);
-            }
-        });
-    });
-
-    updatePreview();
-}
-
-/**
- * Update a single color group's display
- */
-function updateColorGroup(key) {
-    const group = $(`.tb-color-group[data-color-key="${key}"]`);
-    if (!group) return;
-
-    const color = currentColors[key];
-    const displayValue = formatColor(color, colorFormat);
-
-    $('.tb-color-value', group).textContent = displayValue;
-    $('.tb-color-preview', group).style.background = color;
-    $('.tb-color-input', group).value = displayValue;
-    $('input[type="color"]', group).value = normalizeToHex(color);
-}
-
-/**
- * Update the preview area with current colors
- */
-function updatePreview() {
-    const preview = $('#tb-preview');
-    if (!preview) return;
-
-    // Generate derived colors
-    const primaryLight = lightenColor(currentColors.primary, 15);
-    const primaryDark = darkenColor(currentColors.primary, 15);
-    const accentLight = lightenColor(currentColors.accent, 15);
-    const textSecondary = setAlpha(currentColors.text, 0.7);
-    const textTertiary = setAlpha(currentColors.text, 0.5);
-    const cardHover = lightenColor(currentColors.surface, 10);
-    const bgLight = lightenColor(currentColors.background, 8);
-    const bgDark = darkenColor(currentColors.background, 8);
-    const dividerColor = setAlpha(currentColors.text, 0.12);
-    const dividerLight = setAlpha(currentColors.text, 0.08);
-
-    // Apply CSS custom properties to preview
-    preview.style.setProperty('--tb-preview-bg', currentColors.background);
-    preview.style.setProperty('--tb-preview-bg-light', bgLight);
-    preview.style.setProperty('--tb-preview-bg-dark', bgDark);
-    preview.style.setProperty('--tb-preview-surface', currentColors.surface);
-    preview.style.setProperty('--tb-preview-surface-hover', cardHover);
-    preview.style.setProperty('--tb-preview-primary', currentColors.primary);
-    preview.style.setProperty('--tb-preview-primary-light', primaryLight);
-    preview.style.setProperty('--tb-preview-primary-dark', primaryDark);
-    preview.style.setProperty('--tb-preview-secondary', currentColors.secondary);
-    preview.style.setProperty('--tb-preview-accent', currentColors.accent);
-    preview.style.setProperty('--tb-preview-accent-light', accentLight);
-    preview.style.setProperty('--tb-preview-text', currentColors.text);
-    preview.style.setProperty('--tb-preview-text-secondary', textSecondary);
-    preview.style.setProperty('--tb-preview-text-tertiary', textTertiary);
-    preview.style.setProperty('--tb-preview-divider', dividerColor);
-    preview.style.setProperty('--tb-preview-divider-light', dividerLight);
-    preview.style.setProperty('--tb-preview-card', currentColors.surface);
-    preview.style.setProperty('--tb-preview-card-hover', cardHover);
 }
 
 /**
@@ -819,38 +800,39 @@ function renderSavedThemes() {
                 <div class="gh-theme-builder__saved-color" style="background: ${theme.colors.background}"></div>
             </div>
             <span class="gh-theme-builder__saved-name">${escapeHtml(theme.name)}</span>
-            <button class="gh-theme-builder__saved-delete" title="Delete theme">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                </svg>
+            <button class="btn btn--danger btn--icon gh-theme-builder__saved-delete" title="Delete theme">
+                ${trashIcon(16, 'Delete theme')}
             </button>
         </div>
     `).join('');
 
     container.innerHTML = customThemes.length === 0 ? emptyHtml : themesHtml;
 
-    // Click to load theme
+    // Click to activate and load theme
     $$('.gh-theme-builder__saved-item', container).forEach(el => {
         attr(el, {
-            onClick: (e) => {
+            onClick: async (e) => {
                 if (e.target.closest('.gh-theme-builder__saved-delete')) return;
                 const index = parseInt(el.dataset.index);
-            const theme = customThemes[index];
-            if (theme) {
-                currentColors = { ...theme.colors };
-                const nameInput = $('#gh-theme-builder__name-input');
-                if (nameInput) {
-                    nameInput.value = theme.name;
-                    lastSetThemeName = theme.name; // Track this as intentional name set
-                }
-                renderColorSwatches(); // Re-render swatches
-                // Apply preview immediately
-                applyColorsToDocument(currentColors);
-                // Mark as active
-                $$('.gh-theme-builder__saved-item', container).forEach(i => i.classList.remove('active'));
-                el.classList.add('active');
-                // Add to history
-                pushToHistory(currentColors);
+                const theme = customThemes[index];
+                if (theme) {
+                    currentColors = buildThemeColors(theme.colors);
+                    const nameInput = $('#gh-theme-builder__name-input');
+                    if (nameInput) {
+                        nameInput.value = theme.name;
+                        lastSetThemeName = theme.name; // Track this as intentional name set
+                    }
+                    renderColorSwatches(); // Re-render swatches
+                    // Apply preview immediately
+                    applyColorsToDocument(currentColors);
+                    // Add to history
+                    pushToHistory(currentColors);
+
+                    if (!await persistSelectedCustomTheme(theme, currentColors, 'Failed to select theme. Please try again.')) return;
+
+                    // Mark as active
+                    $$('.gh-theme-builder__saved-item', container).forEach(i => i.classList.remove('active'));
+                    el.classList.add('active');
                 }
             }
         });
@@ -876,24 +858,31 @@ function renderSavedThemes() {
             const themeName = customThemes[index]?.name || 'this theme';
 
             if (await dialog.confirm(`Delete "${themeName}"?`, { type: 'danger' })) {
+                const serverTheme = getRuntimeConfig()?.javascript_config?.ui?.theme || 'dark';
+                const selectedTheme = getUserPreference('theme', serverTheme);
+                const wasActiveTheme = selectedTheme === themeId || serverTheme === themeId;
                 customThemes.splice(index, 1);
 
                 // Update config and save
                 const nextConfig = buildConfigWithUI();
                 nextConfig.javascript_config.ui.customThemes = [...customThemes];
+                if (wasActiveTheme) {
+                    nextConfig.javascript_config.ui.theme = 'dark';
+                }
 
                 try {
                     await saveConfig(nextConfig);
                     console.log('Theme deleted:', themeName);
 
                     // If we just deleted the currently active theme, fallback to dark
-                    const { getCurrentTheme, applyTheme } = await import('../../utils/themeManager.js');
-                    const { saveUserPreference } = await import('../../utils/userPreferences.js');
-
-                    if (getCurrentTheme() === themeId) {
+                    if (wasActiveTheme) {
+                        const { applyTheme } = await import('../../utils/themeManager.js');
                         console.log('Active theme deleted, falling back to dark');
-                        applyTheme('dark');
+                        applyTheme('dark', false);
                         await saveUserPreference('theme', 'dark');
+                        initializeColors();
+                        originalColors = { ...currentColors };
+                        originalThemeId = 'dark';
                     }
                 } catch (err) {
                     console.error('Failed to delete theme:', err);
@@ -925,29 +914,23 @@ function randomizeColors() {
 
     // Calculate accent hue based on harmony
     let accentHue;
-    let secondaryHue;
 
     switch (harmony) {
         case 'complementary':
             accentHue = (baseHue + 180) % 360;
-            secondaryHue = (baseHue + 30) % 360;
             break;
         case 'triadic':
             accentHue = (baseHue + 120) % 360;
-            secondaryHue = (baseHue + 240) % 360;
             break;
         case 'split-complementary':
             accentHue = (baseHue + 150) % 360;
-            secondaryHue = (baseHue + 210) % 360;
             break;
         case 'tetradic':
             accentHue = (baseHue + 90) % 360;
-            secondaryHue = (baseHue + 180) % 360;
             break;
         case 'analogous':
         default:
             accentHue = (baseHue + 30) % 360;
-            secondaryHue = (baseHue - 30 + 360) % 360;
             break;
     }
 
@@ -957,7 +940,6 @@ function randomizeColors() {
     if (isDark) {
         currentColors = {
             primary: hslToHex(baseHue, baseSat, 22 + Math.random() * 8),
-            secondary: hslToHex(secondaryHue, baseSat - 10, 28 + Math.random() * 8),
             accent: hslToHex(accentHue, 65 + Math.random() * 20, 50 + Math.random() * 15),
             background: hslToHex(baseHue, 10 + Math.random() * 10, 6 + Math.random() * 4),
             surface: hslToHex(baseHue, 15 + Math.random() * 10, 12 + Math.random() * 6),
@@ -967,7 +949,6 @@ function randomizeColors() {
         // Light theme
         currentColors = {
             primary: hslToHex(baseHue, baseSat, 35 + Math.random() * 10),
-            secondary: hslToHex(secondaryHue, baseSat - 5, 45 + Math.random() * 10),
             accent: hslToHex(accentHue, 70 + Math.random() * 20, 45 + Math.random() * 10),
             background: hslToHex(baseHue, 5 + Math.random() * 10, 95 + Math.random() * 4),
             surface: hslToHex(baseHue, 8 + Math.random() * 10, 90 + Math.random() * 5),
@@ -988,9 +969,14 @@ function randomizeColors() {
     clearThemeNameIfNeeded('Randomized colors');
 
     // Show harmony badge (clear any previous timeout first)
-    const badge = $('#gh-theme-builder__harmony-badge');
+    const badge = $('#gh-theme-builder__harmony-popover');
     if (badge) {
         if (badgeTimeout) clearTimeout(badgeTimeout);
+        if (btn && badge.id === 'gh-theme-builder__harmony-popover') {
+            const rect = btn.getBoundingClientRect();
+            badge.style.setProperty('--harmony-popover-left', `${rect.left + rect.width / 2}px`);
+            badge.style.setProperty('--harmony-popover-bottom', `${window.innerHeight - rect.top + 12}px`);
+        }
         badge.textContent = harmony.charAt(0).toUpperCase() + harmony.slice(1).replace('-', ' ');
         badge.classList.add('visible');
         badgeTimeout = setTimeout(() => {
@@ -1044,7 +1030,6 @@ function invertColors() {
                 newS = isDark ? Math.min(30, s * 1.5) : Math.max(5, s * 0.6);
                 break;
             case 'primary':
-            case 'secondary':
                 // UI elements - moderate inversion
                 newL = isDark ? Math.min(75, 100 - l + 15) : Math.max(25, 100 - l - 15);
                 newS = Math.max(30, Math.min(80, s)); // Keep saturation moderate
@@ -1087,12 +1072,38 @@ function adjustSaturation(factor) {
     renderColorSwatches();
 }
 
+async function persistSelectedCustomTheme(theme, colors, errorMessage) {
+    const nextConfig = buildConfigWithUI();
+    const themesToSave = JSON.parse(JSON.stringify(customThemes)).map(sanitizeThemeRecord);
+    const persistedColors = buildThemeColors(colors);
+
+    nextConfig.javascript_config.ui.theme = theme.id;
+    nextConfig.javascript_config.ui.customThemes = themesToSave;
+
+    try {
+        const result = await saveConfig(nextConfig);
+        console.log('[ThemeBuilder] Save result:', result);
+        console.log('[ThemeBuilder] Selected custom theme:', theme.id);
+        await saveUserPreference('theme', theme.id);
+    } catch (err) {
+        console.error('[ThemeBuilder] Failed to persist selected custom theme:', err);
+        toast.error(errorMessage);
+        return false;
+    }
+
+    originalColors = { ...persistedColors };
+    originalThemeId = theme.id;
+    bus.emit(APP_EVENTS.THEME_CHANGED, { theme: theme.id, custom: true, colors: persistedColors });
+    return true;
+}
+
 /**
  * Save and apply the custom theme
  */
 async function saveAndApplyTheme() {
     const nameInput = $('#gh-theme-builder__name-input');
     const name = nameInput?.value.trim() || `Custom ${Date.now()}`;
+    currentColors = buildThemeColors(currentColors);
 
     console.log('[ThemeBuilder] Saving theme. Current customThemes before:', customThemes.length, customThemes.map(t => t.name));
 
@@ -1115,86 +1126,21 @@ async function saveAndApplyTheme() {
         console.log('[ThemeBuilder] Added new theme. Total now:', customThemes.length);
     }
 
-    // Apply to document first
     applyColorsToDocument(currentColors);
+    if (!await persistSelectedCustomTheme(theme, currentColors, 'Failed to save theme. Please try again.')) return;
 
-    // Build complete config update in one go
-    const nextConfig = buildConfigWithUI();
-
-    // Deep clone customThemes to avoid any reference issues
-    const themesToSave = JSON.parse(JSON.stringify(customThemes));
-
-    // Set all UI config at once (colors live in the customThemes[] entry, not a separate cache)
-    nextConfig.javascript_config.ui.theme = theme.id;
-    nextConfig.javascript_config.ui.customThemes = themesToSave;
-
-    console.log('[ThemeBuilder] Saving to server. customThemes:', themesToSave.length, themesToSave.map(t => t.name));
-
-    // Single save call
-    try {
-        const result = await saveConfig(nextConfig);
-        console.log('[ThemeBuilder] Save result:', result);
-        console.log('[ThemeBuilder] Theme saved:', theme.id);
-
-        // Sync with the active profile so the Preferences Modal shows it as selected.
-        await saveUserPreference('theme', theme.id);
-    } catch (err) {
-        console.error('[ThemeBuilder] Failed to save theme:', err);
-        toast.error('Failed to save theme. Please try again.');
-        return;
-    }
-
-    // Mark as saved so closeThemeBuilder won't revert colors
-    wasSaved = true;
     closeThemeBuilder();
-
-    bus.emit(APP_EVENTS.THEME_CHANGED, { theme: theme.id, custom: true, colors: currentColors });
 }
 
 /**
  * Apply colors directly to document CSS variables
  */
 function applyColorsToDocument(colors) {
+    colors = buildThemeColors(colors, currentColors);
     const root = document.documentElement;
-
-    // Primary colors
-    root.style.setProperty('--primary-color', colors.primary);
-    root.style.setProperty('--primary-color-light', lightenColor(colors.primary, 15));
-    root.style.setProperty('--primary-color-dark', darkenColor(colors.primary, 15));
-
-    // Secondary color
-    root.style.setProperty('--secondary-color', colors.secondary);
-
-    // Accent colors
-    root.style.setProperty('--accent-color', colors.accent);
-    root.style.setProperty('--accent-color-light', lightenColor(colors.accent, 15));
-
-    // Background colors
-    root.style.setProperty('--background-color', colors.background);
-    root.style.setProperty('--background-color-dark', darkenColor(colors.background, 5));
-    root.style.setProperty('--background-color-light', lightenColor(colors.background, 10));
-
-    // Surface color
-    root.style.setProperty('--surface-color', colors.surface);
-
-    // Text colors
-    root.style.setProperty('--text-primary', colors.text);
-    root.style.setProperty('--text-secondary', setAlpha(colors.text, 0.7));
-    root.style.setProperty('--text-tertiary', setAlpha(colors.text, 0.5));
-
-    // Card colors
-    root.style.setProperty('--card-background', colors.surface);
-    root.style.setProperty('--card-hover', lightenColor(colors.surface, 10));
-
-    // Overlay
-    root.style.setProperty('--overlay-color', setAlpha(colors.background, 0.8));
-
-    // RGB values for transparency effects
-    root.style.setProperty('--primary-color-rgb', hexToRgbString(colors.primary));
-    root.style.setProperty('--secondary-color-rgb', hexToRgbString(colors.secondary));
-    root.style.setProperty('--accent-color-rgb', hexToRgbString(colors.accent));
-    root.style.setProperty('--surface-color-rgb', hexToRgbString(colors.surface));
-    root.style.setProperty('--background-color-rgb', hexToRgbString(colors.background));
+    Object.entries(getThemeCssVariables(colors)).forEach(([property, value]) => {
+        root.style.setProperty(property, value);
+    });
 
     // Update meta theme color
     const metaThemeColor = $('meta[name="theme-color"]');
@@ -1213,6 +1159,7 @@ function applyColorsToDocument(colors) {
 function exportTheme() {
     const nameInput = $('#gh-theme-builder__name-input');
     const name = nameInput?.value.trim() || 'My Custom Theme';
+    currentColors = buildThemeColors(currentColors);
 
     const theme = {
         name: name,
@@ -1238,6 +1185,65 @@ function exportTheme() {
     console.log(`[ThemeBuilder] Exported theme: ${name}`);
 }
 
+async function applyImportedTheme(theme, source = 'file') {
+    if (!theme?.colors || typeof theme.colors !== 'object') {
+        toast.error('Invalid theme JSON format');
+        return;
+    }
+
+    currentColors = buildThemeColors(theme.colors, currentColors);
+
+    const themeName = theme.name || `Imported ${Date.now()}`;
+    const nameInput = $('#gh-theme-builder__name-input');
+    if (nameInput) nameInput.value = themeName;
+
+    const newTheme = {
+        id: 'custom-' + Date.now(),
+        name: themeName,
+        colors: { ...currentColors },
+        createdAt: new Date().toISOString(),
+        imported: true
+    };
+
+    const existingIndex = customThemes.findIndex(t => t.name === themeName);
+    if (existingIndex >= 0) {
+        if (await dialog.confirm(`A theme named "${themeName}" already exists. Replace it?`)) {
+            newTheme.id = customThemes[existingIndex].id;
+            customThemes[existingIndex] = newTheme;
+        } else {
+            renderColorSwatches();
+            applyColorsToDocument(currentColors);
+            pushToHistory(currentColors);
+            return;
+        }
+    } else {
+        customThemes.push(newTheme);
+    }
+
+    renderColorSwatches();
+    applyColorsToDocument(currentColors);
+    pushToHistory(currentColors);
+
+    if (!await persistSelectedCustomTheme(newTheme, currentColors, 'Failed to import theme. Please try again.')) return;
+    renderSavedThemes();
+
+    toast.success(`Imported "${themeName}"`);
+    console.log(`[ThemeBuilder] Imported and saved theme from ${source}: ${themeName}`);
+}
+
+async function importThemeJson(text, source = 'file') {
+    if (!text?.trim()) {
+        toast.error(source === 'clipboard' ? 'Clipboard is empty' : 'Theme JSON is empty');
+        return;
+    }
+
+    try {
+        await applyImportedTheme(JSON.parse(text), source);
+    } catch (err) {
+        toast.error('Failed to import theme: ' + err.message);
+    }
+}
+
 /**
  * Import theme from JSON file
  * Loads the theme, saves it to customThemes, and applies it
@@ -1248,62 +1254,11 @@ function importTheme() {
         accept: '.json',
         onChange: async (e) => {
             const file = e.target.files[0];
-        if (!file) return;
+            if (!file) return;
 
-        try {
-            const text = await file.text();
-            const theme = JSON.parse(text);
-
-            if (theme.colors && typeof theme.colors === 'object') {
-                // Apply colors
-                currentColors = { ...currentColors, ...theme.colors };
-
-                // Set theme name
-                const themeName = theme.name || `Imported ${Date.now()}`;
-                const nameInput = $('#gh-theme-builder__name-input');
-                if (nameInput) nameInput.value = themeName;
-
-                // Create theme object
-                const newTheme = {
-                    id: 'custom-' + Date.now(),
-                    name: themeName,
-                    colors: { ...currentColors },
-                    createdAt: new Date().toISOString(),
-                    imported: true
-                };
-
-                // Check if theme with same name exists
-                const existingIndex = customThemes.findIndex(t => t.name === themeName);
-                if (existingIndex >= 0) {
-                    // Ask user if they want to replace
-                    if (await dialog.confirm(`A theme named "${themeName}" already exists. Replace it?`)) {
-                        newTheme.id = customThemes[existingIndex].id; // Keep same ID
-                        customThemes[existingIndex] = newTheme;
-                    } else {
-                        // Don't save, just apply
-                        renderColorSwatches();
-                        applyColorsToDocument(currentColors);
-                        pushToHistory(currentColors);
-                        return;
-                    }
-                } else {
-                    // Add new theme
-                    customThemes.push(newTheme);
-                }
-
-                // Save to config
-                await saveCustomThemes();
-
-                // Render and apply
-                renderColorSwatches();
-                renderSavedThemes();
-                applyColorsToDocument(currentColors);
-                pushToHistory(currentColors);
-
-                console.log(`[ThemeBuilder] Imported and saved theme: ${themeName}`);
-            } else {
-                toast.error('Invalid theme file format');
-            }
+            try {
+                const text = await file.text();
+                await importThemeJson(text, 'file');
             } catch (err) {
                 toast.error('Failed to import theme: ' + err.message);
             }
@@ -1311,6 +1266,30 @@ function importTheme() {
     });
 
     input.click();
+}
+
+async function importThemeFromClipboard() {
+    let text = '';
+
+    if (navigator.clipboard?.readText) {
+        try {
+            text = await navigator.clipboard.readText();
+        } catch (err) {
+            console.warn('[ThemeBuilder] Clipboard read failed:', err);
+        }
+    }
+
+    if (!text) {
+        const pasted = await dialog.prompt('Paste theme JSON', {
+            title: 'Import Theme',
+            confirmText: 'Import',
+            placeholder: '{"name":"...","colors":{...}}'
+        });
+        if (pasted === null) return;
+        text = pasted;
+    }
+
+    await importThemeJson(text, 'clipboard');
 }
 
 /**
@@ -1323,6 +1302,9 @@ function openThemeBuilder() {
         overlay = $('.gh-theme-builder');
     }
     if (overlay) {
+        notifyThemeBuilderOpened();
+        suspendUnderlyingConfigModal();
+        withConfigModalFocusControls('suspendConfigModalFocusTrap');
         isOpen = true;
         setThemeBuilderViewportState('edit');
         overlay.classList.remove('preview-mode'); // Hide floating icon when controls visible
@@ -1333,6 +1315,8 @@ function openThemeBuilder() {
         // Check if we're resuming from preview mode (originalColors still set)
         if (!originalColors) {
             // Fresh open - store original colors for revert
+            const serverTheme = getRuntimeConfig()?.javascript_config?.ui?.theme || 'dark';
+            originalThemeId = getUserPreference('theme', serverTheme);
             initializeColors();
             originalColors = { ...currentColors };
         }
@@ -1364,33 +1348,6 @@ function openThemeBuilder() {
         // Initialize history
         initializeHistory();
 
-        // Initialize mobile tab state
-        const isMobile = window.innerWidth < 768;
-        if (isMobile) {
-            // Show colors panel by default on mobile
-            $$('[data-panel]', overlay).forEach(panel => {
-                if (panel.dataset.panel === 'colors') {
-                    panel.classList.add('active');
-                    panel.style.display = '';
-                } else {
-                    panel.classList.remove('active');
-                    panel.style.display = 'none';
-                }
-            });
-            // Reset tab state
-            $$('.tb-tab', overlay).forEach(tab => {
-                tab.classList.toggle('active', tab.dataset.tab === 'colors');
-            });
-        } else {
-            // Desktop: show all panels
-            $$('[data-panel]', overlay).forEach(panel => {
-                panel.style.display = '';
-                if (panel.dataset.panel !== 'saved') {
-                    panel.classList.add('active');
-                }
-            });
-        }
-
         overlay.classList.add('active');
     }
 }
@@ -1403,22 +1360,37 @@ function hideThemeBuilder() {
     enterPreviewMode();
 }
 
+function restoreThemeOnCancel(themeId, colors) {
+    if (themeId) {
+        import('../../utils/themeManager.js')
+            .then(({ applyTheme }) => applyTheme(themeId, false))
+            .catch((err) => {
+                console.warn('[ThemeBuilder] Failed to restore selected theme on cancel:', err);
+                if (colors) applyColorsToDocument(colors);
+            });
+        return;
+    }
+
+    if (colors) applyColorsToDocument(colors);
+}
+
 /**
- * Cancel and revert to original colors
+ * Cancel and revert only unsaved color edits
  */
 function cancelThemeBuilder() {
     const overlay = $('.gh-theme-builder');
     if (overlay) {
-        // Revert to original colors
-        if (originalColors) {
-            applyColorsToDocument(originalColors);
-        }
+        restoreThemeOnCancel(originalThemeId, originalColors ? { ...originalColors } : null);
 
         isOpen = false;
         originalColors = null;
+        originalThemeId = null;
         overlay.classList.remove('active');
         overlay.classList.remove('preview-mode');
         setThemeBuilderViewportState('closed');
+        resumeUnderlyingConfigModal();
+        notifyThemeBuilderClosed();
+        withConfigModalFocusControls('resumeConfigModalFocusTrap');
     }
 }
 
@@ -1430,9 +1402,13 @@ function closeThemeBuilder() {
     if (overlay) {
         isOpen = false;
         originalColors = null;
+        originalThemeId = null;
         overlay.classList.remove('active');
         overlay.classList.remove('preview-mode');
         setThemeBuilderViewportState('closed');
+        resumeUnderlyingConfigModal();
+        notifyThemeBuilderClosed();
+        withConfigModalFocusControls('resumeConfigModalFocusTrap');
     }
 }
 
@@ -1449,7 +1425,11 @@ function destroyThemeBuilder() {
     }
     isOpen = false;
     originalColors = null;
+    originalThemeId = null;
     setThemeBuilderViewportState('closed');
+    resumeUnderlyingConfigModal();
+    notifyThemeBuilderClosed();
+    withConfigModalFocusControls('resumeConfigModalFocusTrap');
 }
 
 // ==================== Color Utility Functions ====================
@@ -1467,40 +1447,8 @@ function escapeHtml(unsafe) {
         .replace(/'/g, "&#039;");
 }
 
-function normalizeToHex(color) {
-    if (!color) return '#000000';
-    if (color.startsWith('#')) {
-        return color.length === 4
-            ? '#' + color[1] + color[1] + color[2] + color[2] + color[3] + color[3]
-            : color;
-    }
-    // Try to parse RGB/HSL
-    const parsed = parseColor(color);
-    return parsed || '#000000';
-}
-
-function parseColor(input) {
-    if (!input) return null;
-    input = input.trim();
-
-    // HEX
-    if (input.startsWith('#')) {
-        return input;
-    }
-
-    // RGB
-    const rgbMatch = input.match(/rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
-    if (rgbMatch) {
-        return rgbToHex(parseInt(rgbMatch[1]), parseInt(rgbMatch[2]), parseInt(rgbMatch[3]));
-    }
-
-    // HSL
-    const hslMatch = input.match(/hsl\s*\(\s*(\d+)\s*,\s*(\d+)%?\s*,\s*(\d+)%?\s*\)/i);
-    if (hslMatch) {
-        return hslToHex(parseInt(hslMatch[1]), parseInt(hslMatch[2]), parseInt(hslMatch[3]));
-    }
-
-    return null;
+function buildThemeColors(colors = {}, baseColors = currentColors) {
+    return normalizeThemeColors(colors, baseColors);
 }
 
 function formatColor(hex, format) {
@@ -1518,79 +1466,6 @@ function formatColor(hex, format) {
         default:
             return hex;
     }
-}
-
-function hexToRgb(hex) {
-    hex = normalizeToHex(hex).replace('#', '');
-    return [
-        parseInt(hex.substr(0, 2), 16),
-        parseInt(hex.substr(2, 2), 16),
-        parseInt(hex.substr(4, 2), 16)
-    ];
-}
-
-function rgbToHex(r, g, b) {
-    return '#' + [r, g, b].map(x => {
-        const hex = Math.max(0, Math.min(255, Math.round(x))).toString(16);
-        return hex.length === 1 ? '0' + hex : hex;
-    }).join('');
-}
-
-function hexToHsl(hex) {
-    const [r, g, b] = hexToRgb(hex).map(x => x / 255);
-    const max = Math.max(r, g, b), min = Math.min(r, g, b);
-    let h, s, l = (max + min) / 2;
-
-    if (max === min) {
-        h = s = 0;
-    } else {
-        const d = max - min;
-        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-        switch (max) {
-            case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
-            case g: h = ((b - r) / d + 2) / 6; break;
-            case b: h = ((r - g) / d + 4) / 6; break;
-        }
-    }
-
-    return [h * 360, s * 100, l * 100];
-}
-
-function hslToHex(h, s, l) {
-    h /= 360;
-    s /= 100;
-    l /= 100;
-
-    let r, g, b;
-    if (s === 0) {
-        r = g = b = l;
-    } else {
-        const hue2rgb = (p, q, t) => {
-            if (t < 0) t += 1;
-            if (t > 1) t -= 1;
-            if (t < 1 / 6) return p + (q - p) * 6 * t;
-            if (t < 1 / 2) return q;
-            if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-            return p;
-        };
-        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-        const p = 2 * l - q;
-        r = hue2rgb(p, q, h + 1 / 3);
-        g = hue2rgb(p, q, h);
-        b = hue2rgb(p, q, h - 1 / 3);
-    }
-
-    return rgbToHex(r * 255, g * 255, b * 255);
-}
-
-function lightenColor(hex, percent) {
-    const [h, s, l] = hexToHsl(hex);
-    return hslToHex(h, s, Math.min(100, l + percent));
-}
-
-function darkenColor(hex, percent) {
-    const [h, s, l] = hexToHsl(hex);
-    return hslToHex(h, s, Math.max(0, l - percent));
 }
 
 function invertColor(hex) {
@@ -1675,16 +1550,6 @@ function adjustColorSaturation(hex, factor) {
     return hslToHex(h, Math.min(100, Math.max(0, s * factor)), l);
 }
 
-function setAlpha(hex, alpha) {
-    const [r, g, b] = hexToRgb(hex);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-function hexToRgbString(hex) {
-    const [r, g, b] = hexToRgb(hex);
-    return `${r}, ${g}, ${b}`;
-}
-
 // ==================== Undo/Redo Functions ====================
 
 /**
@@ -1705,6 +1570,16 @@ function pushToHistory(colors) {
         historyIndex++;
     }
 
+    updateUndoRedoButtons();
+}
+
+function replaceCurrentHistory(colors) {
+    if (historyIndex < 0 || historyIndex >= colorHistory.length) {
+        pushToHistory(colors);
+        return;
+    }
+
+    colorHistory[historyIndex] = { ...colors };
     updateUndoRedoButtons();
 }
 

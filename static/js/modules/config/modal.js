@@ -146,6 +146,8 @@ class ConfigModalLifecycle extends Module {
         if (elements.configModalSaveBtn) this.on(elements.configModalSaveBtn, 'click', handleSaveConfig);
         if (elements.configModal) this.on(elements.configModal, 'click', this._overlayClickHandler);
         this.on(document, 'keydown', this._escapeHandler);
+        this.on(document, 'ghosthub:theme-builder-opened', suspendConfigModalFocusTrap);
+        this.on(document, 'ghosthub:theme-builder-closed', resumeConfigModalFocusTrap);
     }
 }
 
@@ -410,9 +412,9 @@ function initConfigModal() {
  * Closes the configuration modal and runs section cleanups.
  */
 function closeConfigModal(options = {}) {
-    const { afterClose = null } = options;
+    const { afterClose = null, restoreFocus = true } = options;
     const elements = ensureDOMElementsInitialized();
-    configModalFocusTrap?.deactivate();
+    configModalFocusTrap?.deactivate({ restoreFocus });
     configModalFocusTrap = null;
     if (elements.configModal) {
         elements.configModal.classList.add('hidden');

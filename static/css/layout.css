@@ -835,26 +835,21 @@
 }
 
 .tunnel-copy-btn {
-    /* Style for the copy button */
     padding: var(--space-xs) var(--space-sm);
     font-size: 0.8rem;
-    background-color: var(--secondary-color);
-    /* Or another distinct color */
-    color: var(--text-primary);
-    border: 1px solid var(--secondary-color-light);
+    background-color: var(--btn-secondary-bg);
+    color: var(--btn-secondary-fg);
+    border: 1px solid var(--btn-secondary-border);
     border-radius: var(--radius-sm);
     cursor: pointer;
     margin-left: var(--space-sm);
     text-transform: none;
-    /* Override general button uppercase if needed */
     letter-spacing: normal;
-    /* Override general button letter-spacing */
     width: auto;
-    /* Override general button width */
 }
 
 .tunnel-copy-btn:hover {
-    background-color: var(--secondary-color-light);
+    background-color: var(--btn-secondary-bg-hover);
     box-shadow: var(--shadow-sm);
     transform: translateY(-1px);
 }
@@ -1006,7 +1001,7 @@
     padding: 8px 16px;
     margin-bottom: 16px;
     border-radius: 20px;
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    background: linear-gradient(135deg, var(--primary-color), var(--theme-soft-accent));
     font-size: 0.85rem;
     font-weight: 600;
     box-shadow: var(--shadow-md);
@@ -1194,7 +1189,7 @@
 }
 
 .user-item.admin-user-item {
-    background: linear-gradient(135deg, rgba(var(--primary-color-rgb), 0.08), rgba(var(--secondary-color-rgb), 0.08));
+    background: linear-gradient(135deg, rgba(var(--primary-color-rgb), 0.08), var(--theme-soft-accent-muted));
     border-color: var(--gh-border-strong);
 }
 
@@ -1206,7 +1201,7 @@
     height: 36px;
     flex-shrink: 0;
     border-radius: var(--radius-circle);
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    background: linear-gradient(135deg, var(--primary-color), var(--theme-soft-accent));
     color: var(--text-primary);
 }
 
@@ -1241,7 +1236,7 @@
     display: inline-flex;
     padding: 2px 8px;
     border-radius: var(--radius-sm);
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    background: linear-gradient(135deg, var(--primary-color), var(--theme-soft-accent));
     color: var(--text-primary);
     font-size: 0.75rem;
     font-weight: 700;

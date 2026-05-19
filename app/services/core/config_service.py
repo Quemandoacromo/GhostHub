@@ -3,6 +3,8 @@ import os
 import json
 import logging
 import traceback
+from copy import deepcopy
+
 from app.services.core.runtime_config_service import get_runtime_config_value
 
 logger = logging.getLogger(__name__)
@@ -11,6 +13,39 @@ logger = logging.getLogger(__name__)
 # Use absolute path to prevent nested folder issues
 _instance_folder = os.path.abspath(get_runtime_config_value('INSTANCE_FOLDER_PATH'))
 CONFIG_FILE_PATH = os.path.join(_instance_folder, 'ghosthub_config.json')
+THEME_COLOR_KEYS = ('primary', 'accent', 'background', 'surface', 'text')
+
+
+def _sanitize_theme_colors(colors):
+    """Return a theme color dict in the current five-color contract."""
+    if not isinstance(colors, dict):
+        return colors
+    return {key: colors[key] for key in THEME_COLOR_KEYS if key in colors}
+
+
+def _sanitize_ui_theme_payload(config_data):
+    """Normalize persisted UI theme data to the current theme contract."""
+    ui_config = config_data.get('javascript_config', {}).get('ui')
+    if not isinstance(ui_config, dict):
+        return config_data
+
+    custom_themes = ui_config.get('customThemes')
+    if isinstance(custom_themes, list):
+        sanitized_themes = []
+        for theme in custom_themes:
+            if not isinstance(theme, dict):
+                sanitized_themes.append(theme)
+                continue
+            next_theme = theme.copy()
+            if 'colors' in next_theme:
+                next_theme['colors'] = _sanitize_theme_colors(next_theme['colors'])
+            sanitized_themes.append(next_theme)
+        ui_config['customThemes'] = sanitized_themes
+
+    if isinstance(ui_config.get('customThemeColors'), dict):
+        ui_config['customThemeColors'] = _sanitize_theme_colors(ui_config['customThemeColors'])
+
+    return config_data
 
 def get_default_config():
     """Returns the default configuration structure."""
@@ -169,8 +204,9 @@ def load_config():
             for extra_key, extra_value in loaded_javascript_config.items():
                 if extra_key not in final_javascript_config:
                     final_javascript_config[extra_key] = extra_value
-            
+
             config_data["javascript_config"] = final_javascript_config
+            _sanitize_ui_theme_payload(config_data)
 
             return config_data, None
         else:
@@ -204,8 +240,9 @@ def save_config(new_config_data):
                 logger.error(f"Error creating instance folder {_instance_folder} for config: {e}")
                 return False, f'Failed to create instance folder: {str(e)}'
         
+        config_to_save = _sanitize_ui_theme_payload(deepcopy(new_config_data))
         with open(CONFIG_FILE_PATH, 'w') as f:
-            json.dump(new_config_data, f, indent=2)
+            json.dump(config_to_save, f, indent=2)
         
         return True, "Configuration saved successfully. Some changes may require an application restart to take effect."
     except Exception as e:

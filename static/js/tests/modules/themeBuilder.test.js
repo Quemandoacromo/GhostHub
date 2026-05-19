@@ -96,11 +96,11 @@ describe('ThemeBuilder', () => {
         expect(preset).toHaveProperty('name');
         expect(preset).toHaveProperty('colors');
         expect(preset.colors).toHaveProperty('primary');
-        expect(preset.colors).toHaveProperty('secondary');
         expect(preset.colors).toHaveProperty('accent');
         expect(preset.colors).toHaveProperty('background');
         expect(preset.colors).toHaveProperty('surface');
         expect(preset.colors).toHaveProperty('text');
+        expect(preset.colors).not.toHaveProperty('secondary');
       });
     });
 
@@ -195,7 +195,9 @@ describe('ThemeBuilder', () => {
       themeBuilder.openThemeBuilder();
 
       const colorSwatches = document.querySelectorAll('.gh-theme-builder__swatch');
-      expect(colorSwatches.length).toBe(6); // 6 color keys
+      expect(colorSwatches.length).toBe(5); // 5 user-facing color keys
+      expect(colorSwatches[1].dataset.colorKey).toBe('accent');
+      expect(document.querySelector('[data-color-key="secondary"]')).toBeNull();
     });
 
     it('should restore edit viewport classes when opened', () => {
@@ -311,7 +313,6 @@ describe('ThemeBuilder', () => {
   describe('applyColorsToDocument', () => {
     const testColors = {
       primary: '#ff5500',
-      secondary: '#5500ff',
       accent: '#00ff55',
       background: '#1a1a1a',
       surface: '#2a2a2a',
@@ -391,6 +392,13 @@ describe('ThemeBuilder', () => {
       const textSecondary = document.documentElement.style.getPropertyValue('--text-secondary');
       expect(textSecondary).toContain('rgba');
     });
+
+    it('should ignore stale secondary input fields', () => {
+      themeBuilder.applyColorsToDocument({ ...testColors, secondary: '#5500ff' });
+
+      expect(document.documentElement.style.getPropertyValue('--secondary-color')).toBe('');
+      expect(document.documentElement.style.getPropertyValue('--secondary-color-rgb')).toBe('');
+    });
   });
 
   describe('Modal Interactions', () => {
@@ -432,9 +440,11 @@ describe('ThemeBuilder', () => {
     it('should have export/import buttons', () => {
       const exportBtn = document.getElementById('btn-export');
       const importBtn = document.getElementById('btn-import');
+      const pasteBtn = document.getElementById('btn-import-clipboard');
 
       expect(exportBtn).not.toBeNull();
       expect(importBtn).not.toBeNull();
+      expect(pasteBtn).not.toBeNull();
     });
   });
 
@@ -444,9 +454,10 @@ describe('ThemeBuilder', () => {
       themeBuilder.openThemeBuilder();
     });
 
-    it('should have color input for each color key', () => {
+    it('should have color input for each user-facing color key', () => {
       const colorInputs = document.querySelectorAll('input[type="color"]');
-      expect(colorInputs.length).toBe(6);
+      expect(colorInputs.length).toBe(5);
+      expect(document.querySelector('input[type="color"][data-key="secondary"]')).toBeNull();
     });
 
     it('should update preview when color input changes', () => {
@@ -459,6 +470,16 @@ describe('ThemeBuilder', () => {
       // Check swatch preview updated
       const preview = document.querySelector('[data-color-key="primary"] .gh-theme-builder__swatch-preview');
       expect(preview.style.background).toBe('rgb(255, 0, 0)');
+    });
+
+    it('should not create secondary runtime variables when a visible color changes', () => {
+      const colorInput = document.querySelector('input[type="color"][data-key="primary"]');
+
+      colorInput.value = '#ff0000';
+      colorInput.dispatchEvent(new Event('input'));
+
+      expect(document.documentElement.style.getPropertyValue('--secondary-color')).toBe('');
+      expect(document.documentElement.style.getPropertyValue('--secondary-color-rgb')).toBe('');
     });
   });
 
@@ -482,6 +503,15 @@ describe('ThemeBuilder', () => {
       expect(primaryInput.value.toLowerCase()).toBe('#ff006e');
     });
 
+    it('should not set secondary variables from presets', () => {
+      const cyberpunkPreset = document.querySelector('.gh-theme-builder__preset-item[data-preset="cyberpunk"]');
+      cyberpunkPreset.click();
+
+      expect(document.querySelector('input[type="color"][data-key="secondary"]')).toBeNull();
+      expect(themeBuilder.PRESET_PALETTES.find(p => p.id === 'cyberpunk').colors).not.toHaveProperty('secondary');
+      expect(document.documentElement.style.getPropertyValue('--secondary-color')).toBe('');
+    });
+
     it('should add active class to selected preset', () => {
       const preset = document.querySelector('.gh-theme-builder__preset-item[data-preset="neon-dreams"]');
       preset.click();
@@ -495,8 +525,8 @@ describe('ThemeBuilder', () => {
     beforeEach(() => {
       setUIConfig({
         customThemes: [
-          { id: 'custom-1', name: 'Theme One', colors: { primary: '#111', secondary: '#222', accent: '#333', background: '#444', surface: '#555', text: '#fff' } },
-          { id: 'custom-2', name: 'Theme Two', colors: { primary: '#aaa', secondary: '#bbb', accent: '#ccc', background: '#ddd', surface: '#eee', text: '#000' } }
+          { id: 'custom-1', name: 'Theme One', colors: { primary: '#111', accent: '#333', background: '#444', surface: '#555', text: '#fff' } },
+          { id: 'custom-2', name: 'Theme Two', colors: { primary: '#aaa', accent: '#ccc', background: '#ddd', surface: '#eee', text: '#000' } }
         ]
       });
 

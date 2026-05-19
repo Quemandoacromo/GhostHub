@@ -524,7 +524,7 @@ export function createUserPreferencesSection(closeConfigModal) {
         innerHTML: dropletIcon(16) + ' Create Custom Theme',
     });
     lifecycle.on(customThemeBtn, 'click', () => {
-        closeConfigModal({ afterClose: openThemeBuilder });
+        closeConfigModal({ afterClose: openThemeBuilder, restoreFocus: false });
     });
 
     const customThemeDesc = createElement('div', {

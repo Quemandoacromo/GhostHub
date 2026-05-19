@@ -367,11 +367,9 @@ class UserDataTransferService(Service):
         return filename
 
     def _read_export_config(self):
-        if os.path.exists(config_service.CONFIG_FILE_PATH):
-            with open(config_service.CONFIG_FILE_PATH, 'r', encoding='utf-8') as config_file:
-                config_data = json.load(config_file)
-        else:
-            config_data = config_service.get_default_config()
+        config_data, error = config_service.load_config()
+        if error:
+            logger.warning("Exporting normalized default config after config load warning: %s", error)
 
         self._validate_config(config_data)
         return config_data

@@ -99,9 +99,10 @@ export function setupSharedGestures() {
     gesturesLifecycle.start();
 
     handleTouchStart = (e) => {
-        // Skip if touching chat or modals
+        // Skip if touching chat, modals, or theme builder overlay
         if (e.target.closest('#chat-container')) return;
         if (e.target.closest('.modal:not(.hidden)')) return;
+        if (e.target.closest('.gh-theme-builder')) return;
 
         // Only handle when viewer is visible
         if (!isViewerVisible()) return;
@@ -122,6 +123,7 @@ export function setupSharedGestures() {
     handleTouchMove = (e) => {
         if (e.target.closest('#chat-container')) return;
         if (e.target.closest('.modal:not(.hidden)')) return;
+        if (e.target.closest('.gh-theme-builder')) return;
         if (!isViewerVisible() || !isSwiping) return;
 
         const currentX = e.touches[0].clientX;
@@ -143,6 +145,7 @@ export function setupSharedGestures() {
     handleTouchEnd = (e) => {
         if (e.target.closest('#chat-container')) return;
         if (e.target.closest('.modal:not(.hidden)')) return;
+        if (e.target.closest('.gh-theme-builder')) return;
         if (!isViewerVisible()) return;
 
         const currentTime = new Date().getTime();

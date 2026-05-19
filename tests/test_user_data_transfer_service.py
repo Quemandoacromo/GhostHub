@@ -1,6 +1,7 @@
 """Tests for USB user data transfer service."""
 
 import json
+import os
 import zipfile
 
 import pytest
@@ -124,6 +125,50 @@ class TestUserDataTransferService:
         assert exported_config['javascript_config']['ui']['customThemes'][0]['id'] == 'custom-sunset'
         assert json.loads(exported_profiles[0]['preferences_json'])['theme'] == 'custom-sunset'
         assert exported_wifi_config['ssid']
+
+    def test_export_normalizes_stale_custom_theme_color_keys(self, app_context, tmp_path):
+        drive = register_test_storage_drive(tmp_path, writable=True, device_key='drive-theme-export')
+
+        from app.services.core import config_service
+
+        stale_config = config_service.get_default_config()
+        stale_config['javascript_config']['ui']['theme'] = 'custom-stale'
+        stale_config['javascript_config']['ui']['customThemes'] = [{
+            'id': 'custom-stale',
+            'name': 'Stale Theme',
+            'colors': {
+                'primary': '#112233',
+                'secondary': '#445566',
+                'accent': '#778899',
+                'background': '#000000',
+                'surface': '#111111',
+                'text': '#ffffff',
+            },
+        }]
+        stale_config['javascript_config']['ui']['customThemeColors'] = {
+            'primary': '#112233',
+            'secondary': '#445566',
+            'accent': '#778899',
+            'background': '#000000',
+            'surface': '#111111',
+            'text': '#ffffff',
+        }
+
+        os.makedirs(os.path.dirname(config_service.CONFIG_FILE_PATH), exist_ok=True)
+        with open(config_service.CONFIG_FILE_PATH, 'w', encoding='utf-8') as config_file:
+            json.dump(stale_config, config_file)
+
+        job_id = _service().start_export(drive['id'])
+        job = _service().get_job(job_id)
+
+        assert job['status'] == 'complete'
+        export_path = tmp_path / 'GhostHubBackups' / job['result']['filename']
+        with zipfile.ZipFile(export_path, 'r') as export_zip:
+            exported_config = json.loads(export_zip.read('ghosthub_config.json'))
+
+        ui_config = exported_config['javascript_config']['ui']
+        assert 'secondary' not in ui_config['customThemes'][0]['colors']
+        assert 'secondary' not in ui_config['customThemeColors']
 
     def test_same_device_export_import_preserves_row_counts(self, app_context, tmp_path):
         drive = register_test_storage_drive(tmp_path, writable=True, device_key='drive-smoke')

@@ -37,7 +37,8 @@ export class StreamingContainerComponent extends Component {
     onStart() {
         if (!this.element) return;
 
-        // Scroll-to-top button — lives on body so it floats above layout
+        // Keep this in the app shell so theme-builder minimization captures it
+        // with the rest of the app instead of leaving it viewport-anchored.
         const existing = document.getElementById('streaming-scroll-top');
         if (existing) existing.remove();
 
@@ -49,7 +50,7 @@ export class StreamingContainerComponent extends Component {
             style: { display: 'none' }
         });
         scrollBtn.innerHTML = chevronUpIcon(24);
-        append(document.body, scrollBtn);
+        append(this.element, scrollBtn);
         this._scrollBtn = scrollBtn;
 
         this.on(this.element, 'scroll', () => {

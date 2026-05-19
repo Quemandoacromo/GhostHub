@@ -124,10 +124,12 @@ class TestConfigServiceLoadConfig:
             assert len(ui_config['customThemes']) == 1
             assert ui_config['customThemes'][0]['id'] == 'custom-123456'
             assert ui_config['customThemes'][0]['name'] == 'My Theme'
+            assert 'secondary' not in ui_config['customThemes'][0]['colors']
             
             # customThemeColors should be preserved
             assert 'customThemeColors' in ui_config
             assert ui_config['customThemeColors']['primary'] == '#ff0000'
+            assert 'secondary' not in ui_config['customThemeColors']
         finally:
             config_service.CONFIG_FILE_PATH = original_path
     
@@ -327,6 +329,7 @@ class TestConfigServiceSaveConfig:
             config, error = config_service.load_config()
             assert error is None
             assert config['javascript_config']['ui']['customThemes'][0]['name'] == 'Saved Theme'
+            assert 'secondary' not in config['javascript_config']['ui']['customThemes'][0]['colors']
         finally:
             config_service.CONFIG_FILE_PATH = original_path
             config_service._instance_folder = original_instance
@@ -416,7 +419,9 @@ class TestConfigServiceRoundTrip:
             assert ui['customThemes'][0]['id'] == 'custom-roundtrip'
             assert ui['customThemes'][0]['name'] == 'Round Trip Theme'
             assert ui['customThemes'][0]['colors']['primary'] == '#123456'
+            assert 'secondary' not in ui['customThemes'][0]['colors']
             assert ui['customThemeColors']['primary'] == '#123456'
+            assert 'secondary' not in ui['customThemeColors']
         finally:
             config_service.CONFIG_FILE_PATH = original_path
             config_service._instance_folder = original_instance

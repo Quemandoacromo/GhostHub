@@ -57,15 +57,21 @@
 .btn--primary,
 .btn-primary,
 .btn-accent {
-    background: var(--btn-primary-bg);
-    border-color: rgba(var(--accent-color-rgb), 0.3);
+    border-color: rgba(255, 255, 255, 0.14);
+    background:
+        var(--btn-primary-bg) padding-box,
+        rgba(255, 255, 255, 0.14) border-box;
+    background-clip: padding-box, border-box;
     color: var(--btn-primary-fg);
 }
 
 .btn--primary:hover:not(:disabled),
 .btn-primary:hover:not(:disabled),
 .btn-accent:hover:not(:disabled) {
-    background: var(--btn-primary-bg-hover);
+    background:
+        var(--btn-primary-bg-hover) padding-box,
+        rgba(255, 255, 255, 0.18) border-box;
+    background-clip: padding-box, border-box;
     box-shadow: var(--btn-primary-shadow-hover);
 }
 

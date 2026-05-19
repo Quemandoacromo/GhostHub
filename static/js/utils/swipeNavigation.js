@@ -15,6 +15,7 @@ const DEFAULT_CONFIG = {
     excludeSelectors: [      // Elements that block swipe handling
         '#chat-container',
         '.modal:not(.hidden)',
+        '.gh-theme-builder',
         '.media-controls',
         '.gh-back-btn',
         '.vc-bottom',

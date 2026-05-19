@@ -79,11 +79,12 @@ GhostHub is token-based, not color-literal.
 The core visual roles are:
 
 - `primary`
-- `secondary`
 - `accent`
 - `background`
 - `surface`
 - `text`
+
+Derived component tokens, such as secondary buttons, cards, modal glass, borders, and muted text, should come from those five roles. Do not add another user-facing color field for a component role unless it carries enough distinct meaning to justify the extra theme burden.
 
 Rules:
 
