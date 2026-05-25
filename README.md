@@ -26,6 +26,8 @@
   <img src="Settings.PNG" alt="GhostHub system stats" width="31%">
 </p>
 
+*(Note: The custom theme shown in the screenshots above is called "Oasis" in the [Community Theme Gallery](https://bleedingxiko.github.io/GhosthHub_Themes/).)*
+
 > **Compatibility:** GhostHub targets Raspberry Pi 4 using the supported 2022-01-28 Raspberry Pi OS Lite Bullseye image. Use `arm64` for the recommended Pi 4 setup, or `armhf` if you need the 32-bit build. It is not a generic installer for every Raspberry Pi OS image.
 
 ---
@@ -42,6 +44,7 @@ GhostHub supports two network modes:
 
 - Streaming and Gallery layouts for photos and videos
 - Profiles with avatars, resume progress, and per-user history
+- Custom themes via the built-in Theme Builder and the [Community Theme Gallery](https://bleedingxiko.github.io/GhosthHub_Themes/) ([GitHub Repo](https://github.com/BleedingXiko/GhosthHub_Themes))
 - Upload, download, rename, and delete actions
 - Categories, hidden folders, playlists, sorting, and search
 - Subtitles for video (`.srt .vtt .ass .ssa`), auto-converted via ffmpeg
