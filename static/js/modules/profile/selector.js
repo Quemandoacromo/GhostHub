@@ -23,7 +23,9 @@ import {
     PROFILES_CHANGED_EVENT,
 } from './events.js';
 import {
+    clearStoredProfile,
     getStoredProfileId,
+    getStoredProfileName,
     syncActiveProfile,
     validateProfileName,
 } from '../../utils/profileUtils.js';
@@ -126,12 +128,22 @@ class ProfileSelector extends Module {
 
             const data = await response.json().catch(() => ({}));
 
+            if (response.status === 409) {
+                this._handleProfileInUseElsewhere(profileId);
+                return null;
+            }
+
             if (!response.ok || (profileId && !data.profile)) {
                 throw new Error(data.error || data.message || 'Failed to select profile.');
             }
 
-            await this.refreshProfiles();
-            this._setActiveProfile(data.profile, { closeIfSelected: true });
+            if (Array.isArray(data.profiles)) {
+                this.state.profiles = data.profiles;
+                this._setActiveProfile(data.active_profile || data.profile || null, { closeIfSelected: true });
+            } else {
+                await this.refreshProfiles();
+                this._setActiveProfile(data.profile, { closeIfSelected: true });
+            }
             window.dispatchEvent(new CustomEvent(PROFILE_SELECTED_EVENT, {
                 detail: {
                     profile: data.profile || null,
@@ -248,13 +260,14 @@ class ProfileSelector extends Module {
     async handleRemoteProfileSelected(payload) {
         if (payload && Object.prototype.hasOwnProperty.call(payload, 'profile')) {
             this._setActiveProfile(payload.profile || null, {
-                closeIfSelected: Boolean(payload.profile),
+                closeIfSelected: true,
             });
             this._renderOverlay();
             return;
         }
 
-        await this.refreshProfiles();
+        const data = await this.refreshProfiles();
+        this._setActiveProfile(data.active_profile || null, { closeIfSelected: true });
         this._renderOverlay();
     }
 
@@ -282,18 +295,51 @@ class ProfileSelector extends Module {
         this._renderOverlay();
     }
 
+    _handleProfileInUseElsewhere(profileId) {
+        const storedProfileId = getStoredProfileId();
+        const isOwnStoredProfile = profileId && profileId === storedProfileId;
+        const lockedProfile = this.state.profiles.find((profile) => profile.id === profileId);
+        const profileName = lockedProfile?.name
+            || (isOwnStoredProfile ? getStoredProfileName() : '')
+            || '';
+
+        if (isOwnStoredProfile) {
+            clearStoredProfile();
+            this._setActiveProfile(null, { closeIfSelected: false });
+            window.dispatchEvent(new CustomEvent(PROFILE_SELECTED_EVENT, {
+                detail: { profile: null },
+            }));
+        }
+
+        const message = profileName
+            ? (isOwnStoredProfile
+                ? `${profileName} is already signed in on another device. You've been signed out — pick a profile to continue.`
+                : `${profileName} is already in use on another device.`)
+            : 'That profile is already in use on another device.';
+        toast.warning(message);
+        this.state.errorMessage = message;
+
+        this.refreshProfiles().catch(() => {}).finally(() => {
+            if (isOwnStoredProfile) {
+                this.open({ required: true });
+            } else {
+                this._renderOverlay();
+            }
+        });
+    }
+
     _setActiveProfile(profile, options = {}) {
         const { closeIfSelected = true } = options;
         this.state.activeProfile = profile || null;
         syncActiveProfile(profile || null);
 
-        if (profile?.id && closeIfSelected) {
+        if (closeIfSelected) {
             this.state.overlayOpen = false;
             this.state.overlayRequired = false;
         }
 
-        if (profile?.id && this.pendingResolver) {
-            this.pendingResolver(profile);
+        if (this.pendingResolver) {
+            this.pendingResolver(profile || null);
             this.pendingResolver = null;
         }
     }
