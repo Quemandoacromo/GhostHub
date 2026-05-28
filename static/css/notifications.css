@@ -19,6 +19,46 @@
     width: min(360px, calc(100vw - 48px));
 }
 
+/* ===== DYNAMIC VIEW TRANSITIONS =====
+   We only assign view-transition-names dynamically when overlays are active.
+   This prevents empty overlays from consuming GPU textures on every transition,
+   avoiding Chromium's texture-budget downscaling and keeping transitions sharp.
+   Disabling the root transition in base.css ensures they render on top and never blink. */
+
+#toast-container:has(.gh-toast) {
+    view-transition-name: gh-toast-layer;
+}
+
+#dialog-overlay.gh-dialog-overlay--visible {
+    view-transition-name: gh-dialog-layer;
+}
+
+.download-notification:not(.notification-leaving) {
+    view-transition-name: gh-download-notification-layer;
+}
+
+.gallery-thumbnail-progress-notification {
+    view-transition-name: gh-gallery-thumbnail-progress-layer;
+}
+
+.gallery-processing-notifications:has(.gallery-processing-notification) {
+    view-transition-name: gh-gallery-processing-layer;
+}
+
+::view-transition-old(gh-toast-layer),
+::view-transition-new(gh-toast-layer),
+::view-transition-old(gh-dialog-layer),
+::view-transition-new(gh-dialog-layer),
+::view-transition-old(gh-download-notification-layer),
+::view-transition-new(gh-download-notification-layer),
+::view-transition-old(gh-gallery-thumbnail-progress-layer),
+::view-transition-new(gh-gallery-thumbnail-progress-layer),
+::view-transition-old(gh-gallery-processing-layer),
+::view-transition-new(gh-gallery-processing-layer) {
+    animation: none;
+    mix-blend-mode: normal;
+}
+
 /* ===================== TOAST ITEM ===================== */
 
 .gh-toast {

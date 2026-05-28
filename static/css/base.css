@@ -113,6 +113,8 @@
  */
 
 :root {
+    view-transition-name: none;
+
     /* ===== SPACING SYSTEM (Theme-Independent) ===== */
     --space-xs: 4px;
     --space-sm: 8px;
@@ -271,8 +273,13 @@
 
 ::view-transition-old(gh-active-layout),
 ::view-transition-new(gh-active-layout) {
-    animation-duration: 280ms;
+    animation-duration: 180ms;
     animation-timing-function: var(--gh-motion-emphasis);
+    mix-blend-mode: normal;
+    height: 100%;
+    width: 100%;
+    object-fit: none;
+    object-position: top left;
 }
 
 @keyframes gh-fade-up-in {
