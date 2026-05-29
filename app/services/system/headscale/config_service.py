@@ -239,7 +239,28 @@ def get_bootstrap_server_url() -> Optional[str]:
     try:
         with open(HS_BOOTSTRAP_URL_PATH, "r") as bootstrap_file:
             value = bootstrap_file.read().strip()
-        return normalize_server_url(value)
+        normalized = normalize_server_url(value)
+        if not normalized:
+            return None
+
+        # Validate that the cached IP address (if it's an IP) is still active on one of our network interfaces
+        from urllib.parse import urlsplit
+        import ipaddress
+        parts = urlsplit(normalized)
+        if parts.hostname:
+            try:
+                ipaddress.ip_address(parts.hostname)
+                from app.services.system.network_detection_service import get_interface_ips
+                interface_ips = get_interface_ips()
+                active_ips = set(interface_ips.values())
+                if parts.hostname not in active_ips:
+                    logger.warning("Stale bootstrap URL detected: %s (IP is no longer active)", normalized)
+                    return None
+            except ValueError:
+                # Hostname is not an IP address (e.g. domain name), keep it
+                pass
+
+        return normalized
     except Exception as err:
         logger.warning(
             "Failed to read Headscale bootstrap URL from %s: %s",
@@ -247,6 +268,7 @@ def get_bootstrap_server_url() -> Optional[str]:
             err,
         )
         return None
+
 
 
 def ensure_bootstrap_server_url(server_url: str) -> bool:
@@ -304,25 +326,55 @@ def ensure_server_url(server_url: str) -> bool:
 
 def repair_server_url_from_bootstrap() -> bool:
     """Repair poisoned live server_url values back to the persisted local bootstrap URL."""
-    bootstrap_url = get_bootstrap_server_url()
-    if not bootstrap_url or is_invalid_bootstrap_server_url(bootstrap_url):
-        return True
+    from app.services.system.network_detection_service import get_interface_ips
+    interface_ips = get_interface_ips()
+    active_ips = set(interface_ips.values())
 
+    bootstrap_url = get_bootstrap_server_url()
+    
     current_server_url = get_config_server_url()
     normalized_current = normalize_server_url(current_server_url)
 
-    if normalized_current == bootstrap_url:
-        return True
-
+    # Validate if current is active. If current is stale/invalid, we MUST repair it.
+    current_is_valid_active = False
     if normalized_current and not is_invalid_bootstrap_server_url(normalized_current):
+        from urllib.parse import urlsplit
+        import ipaddress
+        parts = urlsplit(normalized_current)
+        if parts.hostname:
+            try:
+                ipaddress.ip_address(parts.hostname)
+                if parts.hostname in active_ips:
+                    current_is_valid_active = True
+            except ValueError:
+                # Hostname is not an IP address (e.g. domain name), assume OK
+                current_is_valid_active = True
+        else:
+            current_is_valid_active = True
+
+    if current_is_valid_active:
         return True
 
+    # If we have a valid bootstrap URL, use it
+    if bootstrap_url and not is_invalid_bootstrap_server_url(bootstrap_url):
+        logger.warning(
+            "Repairing Headscale server_url from %s back to bootstrap URL %s",
+            current_server_url,
+            bootstrap_url,
+        )
+        return ensure_server_url(bootstrap_url)
+
+    # Fallback to the primary active network IP
+    from app.utils.system_utils import get_local_ip
+    primary_ip = interface_ips.get('eth0') or interface_ips.get('wlan0') or get_local_ip()
+    fallback_url = f"http://{primary_ip}:8080"
     logger.warning(
-        "Repairing Headscale server_url from %s back to bootstrap URL %s",
+        "Forcing stale Headscale server_url from %s to active IP fallback %s",
         current_server_url,
-        bootstrap_url,
+        fallback_url,
     )
-    return ensure_server_url(bootstrap_url)
+    return ensure_server_url(fallback_url)
+
 
 
 def ensure_derp_enabled() -> bool:

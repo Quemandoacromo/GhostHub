@@ -67,20 +67,50 @@ def _get_server_url():
 
 def _get_bootstrap_server_url():
     """Pick a stable local enrollment URL for Headscale custom-server login."""
+    interface_ips = network_detection_service.get_interface_ips()
+    active_ips = set(interface_ips.values())
+
     bootstrap_url = normalize_server_url(get_bootstrap_server_url())
     if bootstrap_url and not _is_invalid_enrollment_server_url(bootstrap_url):
-        return bootstrap_url
+        from urllib.parse import urlsplit
+        parts = urlsplit(bootstrap_url)
+        if parts.hostname in active_ips:
+            return bootstrap_url
 
     existing_url = normalize_server_url(get_config_server_url())
     if existing_url and not _is_invalid_enrollment_server_url(existing_url):
-        return existing_url
+        from urllib.parse import urlsplit
+        parts = urlsplit(existing_url)
+        if parts.hostname in active_ips:
+            return existing_url
 
     return _get_server_url()
 
 
+
 def _requires_local_server_url_repair(server_url):
-    """Repair only obviously poisoned app/loopback URLs, not live mesh URLs."""
-    return is_invalid_bootstrap_server_url(server_url)
+    """Repair stale interface IPs, poisoned app/loopback URLs, or invalid URLs."""
+    if is_invalid_bootstrap_server_url(server_url):
+        return True
+
+    from urllib.parse import urlsplit
+    parts = urlsplit(server_url)
+    if not parts.hostname:
+        return True
+
+    # If the hostname is an IP, check if it's currently active on our interfaces
+    import ipaddress
+    try:
+        ipaddress.ip_address(parts.hostname)
+        active_ips = set(network_detection_service.get_interface_ips().values())
+        if parts.hostname not in active_ips:
+            return True
+    except ValueError:
+        # Not an IP address (e.g. domain), assume OK
+        pass
+
+    return False
+
 
 
 def _emit_tunnel_status(data):
