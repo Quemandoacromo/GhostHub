@@ -88,14 +88,26 @@ class HeadscaleRuntimeService(Service):
                 return False, message
 
             if is_hs_running():
-                logger.info("Headscale is already running")
-                if verify_tailscale_connectivity():
-                    logger.info("Pi is already connected to mesh with valid IP")
-                    update_dns_record()
-                    message = "Headscale already running and Pi is connected to mesh."
-                    self._set_runtime_state(True, message, mesh_joined=True)
-                    return True, message
-                logger.info("Headscale running but Pi not properly connected - attempting to join")
+                from app.services.system.headscale.config_service import (
+                    get_config_server_url,
+                    get_bootstrap_server_url,
+                    is_invalid_bootstrap_server_url,
+                )
+                current_config_url = get_config_server_url()
+                bootstrap_url = get_bootstrap_server_url()
+                if current_config_url != bootstrap_url or is_invalid_bootstrap_server_url(current_config_url):
+                    logger.warning("Headscale running with stale IP config - forcing service restart to reload configuration")
+                    stop_running_service()
+                else:
+                    logger.info("Headscale is already running with up-to-date config")
+                    if verify_tailscale_connectivity():
+                        logger.info("Pi is already connected to mesh with valid IP")
+                        update_dns_record()
+                        message = "Headscale already running and Pi is connected to mesh."
+                        self._set_runtime_state(True, message, mesh_joined=True)
+                        return True, message
+                    logger.info("Headscale running but Pi not properly connected - attempting to join")
+
                 _progress("joining", "Joining Pi to mesh network...")
                 mesh_success = join_pi_to_mesh(progress_cb=progress_cb)
                 if not mesh_success:
